@@ -80,8 +80,8 @@ class PMPro_Members_List_Table extends WP_List_Table {
 			'display_name'		=> 'Display Name',
 			'user_email'		=> 'Email',
 			'address'			=> 'Billing Address',
-			'membership'		=> 'Level',
-			'membership_id'		=> 'Level ID',
+			'memberships'		=> 'Levels',
+			'membership_ids'	=> 'Level IDs',
 			'fee'				=> 'Fee',
 			'joindate'			=> 'Registered',
 			'startdate'			=> 'Start Date',
@@ -179,14 +179,6 @@ class PMPro_Members_List_Table extends WP_List_Table {
 			),
 			'user_email'     => array(
 				'user_email',
-				false,
-			),
-			'membership'     => array(
-				'membership',
-				false,
-			),
-			'membership_id'  => array(
-				'membership_id',
 				false,
 			),
 			'joindate'       => array(
@@ -367,8 +359,6 @@ class PMPro_Members_List_Table extends WP_List_Table {
 			'user_login' 		=> 'u.user_login',
 			'display_name' 		=> 'u.display_name',
 			'user_email' 		=> 'u.user_email',
-			'membership' 		=> 'mu.membership_id',
-			'membership_id' 	=> 'mu.membership_id',
 			'fee' 				=> 'fee',
 			'joindate' 			=> 'u.user_registered',
 			'startdate' 		=> 'mu.startdate',
@@ -515,8 +505,13 @@ class PMPro_Members_List_Table extends WP_List_Table {
 	 * @param object $item A row's data.
 	 * @return string Text to be placed insmembershipe the column <td>.
 	 */
-	public function column_membership( $item ) {
-		return $item['membership'];
+	public function column_memberships( $item ) {
+		$user_levels = pmpro_getMembershipLevelsForUser( $item['ID'] );
+		$memlevels   = array();
+		foreach ( $user_levels as $curlevel ) {
+			$memlevels[] = $curlevel->name;
+		}
+		return implode( ', ', $memlevels );
 	}
 
 	/**
@@ -525,8 +520,13 @@ class PMPro_Members_List_Table extends WP_List_Table {
 	 * @param object $item A row's data.
 	 * @return string Text to be placed insmembership_ide the column <td>.
 	 */
-	public function column_membership_id( $item ) {
-		return $item['membership_id'];
+	public function column_membership_ids( $item ) {
+		$user_levels = pmpro_getMembershipLevelsForUser( $item['ID'] );
+		$memlevels   = array();
+		foreach ( $user_levels as $curlevel ) {
+			$memlevels[] = $curlevel->id;
+		}
+		return implode( ', ', $memlevels );
 	}
 
 	/**

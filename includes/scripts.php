@@ -97,7 +97,7 @@ function pmpro_admin_enqueue_scripts() {
     // Admin JS
     wp_register_script( 'pmpro_admin',
                         plugins_url( 'js/pmpro-admin.js', dirname(__FILE__) ),
-                        array( 'jquery', 'jquery-ui-sortable' ),
+                        array( 'jquery', 'jquery-ui-sortable', 'jquery-ui-dialog', 'jquery-migrate' ),
                         PMPRO_VERSION );
     $all_levels = pmpro_getAllLevels( true, true );
     $all_level_values_and_labels = array();
@@ -106,7 +106,13 @@ function pmpro_admin_enqueue_scripts() {
     }
     wp_localize_script( 'pmpro_admin', 'pmpro', array(
         'all_levels' => $all_levels,
-        'all_level_values_and_labels' => $all_level_values_and_labels
+        'all_level_values_and_labels' => $all_level_values_and_labels,
+        'lang' => array(
+            'confirm_delete' => __( 'Are you sure you want to delete this group? It cannot be undone.', 'pmprommpu' ),
+        ),
+        'settings' => array(
+            'level_page_url' => add_query_arg( 'page', 'pmpro-membershiplevels', admin_url( 'admin.php' ) ),
+        )
     ));
     wp_enqueue_script( 'pmpro_admin' );
 
@@ -132,5 +138,13 @@ function pmpro_admin_enqueue_scripts() {
     if( $admin_css_rtl ) {
         wp_enqueue_style('pmpro_admin_rtl', $admin_css_rtl, array(), PMPRO_VERSION, "screen");
     }
+
+    // jQuery Admin CSS
+    $csspath = plugins_url("css/jquery-ui.min.css", dirname(__FILE__));
+    wp_enqueue_style( 'pmpro_jquery_ui', $csspath, array(), PMPRO_VERSION, "screen");
+    $csspath = plugins_url("css/jquery-ui.structure.min.css", dirname(__FILE__));
+    wp_enqueue_style( 'pmpro_jquery_ui_structure', $csspath, array(), PMPRO_VERSION, "screen");
+    $csspath = plugins_url("css/jquery-ui.theme.min.css", dirname(__FILE__));
+    wp_enqueue_style( 'pmpro_jquery_ui_theme', $csspath, array(), PMPRO_VERSION, "screen");
 }
 add_action( 'admin_enqueue_scripts', 'pmpro_admin_enqueue_scripts' );

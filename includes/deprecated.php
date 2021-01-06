@@ -53,3 +53,34 @@ function pmpro_admin_init_redirect_old_menu_items() {
 	}
 }
 add_action( 'init', 'pmpro_admin_init_redirect_old_menu_items' );
+
+/**
+ * Create, add, remove or updates the membership level of the given user to the given level.
+ *
+ * $level may either be the ID or name of the desired membership_level.
+ * If $user_id is omitted, the value will be retrieved from $current_user.
+ *
+ * @param int    $level ID of level to set as new level, use 0 to cancel membership
+ * @param int    $user_id ID of the user to change levels for
+ * @param string $old_level_status The status to set for the row in the memberships users table. (e.g. inactive, cancelled, admin_cancelled, expired) Defaults to 'inactive'.
+ * $param int $cancel_level If set cancel just this one level instead of all active levels (to support Multiple Memberships per User)
+ *
+ * Return values:
+ *      Success returns boolean true.
+ *      Failure returns boolean false.
+ */
+function pmpro_changeMembershipLevel( $level, $user_id = null, $old_level_status = 'inactive', $cancel_level = null ) {
+	if ( empty( $level ) ) {
+		$return = pmpro_cancel_all_membership_levels( $user_id, $old_level_status );
+	} else {
+		if ( ! empty( $cancel_level ) ) {
+			pmpro_cancel_membership_levels( $cancel_level, $user_id, $old_level_status );
+		}
+		$return = pmpro_add_membership_level( $level, $user_id );
+	}
+	return $return;
+}
+
+function pmpro_cancelMembershipLevel( $cancel_level, $user_id = null, $old_level_status = 'inactive' ) {
+	return pmpro_cancel_membership_level( $cancel_level, $user_id, $old_level_status );
+}

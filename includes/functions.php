@@ -40,6 +40,8 @@ function pmpro_setDBTables() {
 	$wpdb->pmpro_discount_codes_uses = $wpdb->prefix . 'pmpro_discount_codes_uses';
 	$wpdb->pmpro_membership_levelmeta = $wpdb->prefix . 'pmpro_membership_levelmeta';
 	$wpdb->pmpro_membership_ordermeta = $wpdb->prefix . 'pmpro_membership_ordermeta';
+	$wpdb->pmpro_groups = $wpdb->prefix . 'pmpro_groups';
+	$wpdb->pmpro_membership_levels_groups = $wpdb->prefix . 'pmpro_membership_levels_groups';
 }
 pmpro_setDBTables();
 
@@ -538,9 +540,9 @@ function pmpro_getLevelsCost( &$levels, $tags = true, $short = false ) {
 	// trial part - not as detailed as the single-level counterpart. Could be improved in the future.
 	if ( $trialperiods > 0 ) {
 		if ( $trialperiods == 1 ) {
-			$r .= __( 'Trial pricing has been applied to the first payment.', 'mmpu' );
+			$r .= __( 'Trial pricing has been applied to the first payment.', 'paid-memberships-pro' );
 		} else {
-			$r .= sprintf( __( 'Trial pricing has been applied to the first %d payments.', 'mmpu' ), $trialperiods );
+			$r .= sprintf( __( 'Trial pricing has been applied to the first %d payments.', 'paid-memberships-pro' ), $trialperiods );
 		}
 	}
 
@@ -928,34 +930,10 @@ function pmpro_hasMembershipLevel( $levels = null, $user_id = null ) {
 	return $return;
 }
 
-/**
- * Wrapper for pmpro_changeMembershipLevel to cancel one level.
- *
- * @since 1.8.11
- */
-function pmpro_cancelMembershipLevel( $cancel_level, $user_id = null, $old_level_status = 'inactive' ) {
-	return pmpro_changeMembershipLevel( 0, $user_id, $old_level_status, $cancel_level );
-}
+function pmpro_add_membership_level( $level, $user_id = NULL ) {
+	global $current_user, $wpdb, $pmpro_error;
 
-/**
- * Create, add, remove or updates the membership level of the given user to the given level.
- *
- * $level may either be the ID or name of the desired membership_level.
- * If $user_id is omitted, the value will be retrieved from $current_user.
- *
- * @param int    $level ID of level to set as new level, use 0 to cancel membership
- * @param int    $user_id ID of the user to change levels for
- * @param string $old_level_status The status to set for the row in the memberships users table. (e.g. inactive, cancelled, admin_cancelled, expired) Defaults to 'inactive'.
- * $param int $cancel_level If set cancel just this one level instead of all active levels (to support Multiple Memberships per User)
- *
- * Return values:
- *      Success returns boolean true.
- *      Failure returns boolean false.
- */
-function pmpro_changeMembershipLevel( $level, $user_id = null, $old_level_status = 'inactive', $cancel_level = null ) {
-	global $wpdb;
-	global $current_user, $pmpro_error;
-
+	//default to current user
 	if ( empty( $user_id ) ) {
 		$user_id = $current_user->ID;
 	}
@@ -968,12 +946,19 @@ function pmpro_changeMembershipLevel( $level, $user_id = null, $old_level_status
 	// make sure user id is int for security
 	$user_id = intval( $user_id );
 
+	//assume false
+	$return = false;
+
+	$level_id = -1;
+
+	// Make sure we have a level object.
 	if ( empty( $level ) ) {
-		$level = 0;
+		$pmpro_error = __( 'Empty membership level passed to pmpro_add_membership_level.', 'paid-memberships-pro' );
+		return false;
 	} else if ( is_array( $level ) ) {
 		// custom level
 		if ( empty( $level['membership_id'] ) ) {
-			$pmpro_error = __( 'No membership_id specified in pmpro_changeMembershipLevel.', 'paid-memberships-pro' );
+			$pmpro_error = __( 'No membership_id specified in pmpro_add_membership_level.', 'paid-memberships-pro' );
 			return false;
 		}
 
@@ -993,24 +978,29 @@ function pmpro_changeMembershipLevel( $level, $user_id = null, $old_level_status
 		$level = $level_obj->id;
 		unset( $level_obj );
 	}
-
-	// if it's a custom level, they're changing
+	
+	// if it's a custom level, they're updating their level.
 	if ( ! is_array( $level ) ) {
 		// are they even changing?
 		if ( pmpro_hasMembershipLevel( $level, $user_id ) ) {
 			$pmpro_error = __( 'not changing?', 'paid-memberships-pro' );
 			return false; // not changing
 		}
-	}
+	}	
 
-	// get all active membershipships for this user
-	$old_levels = pmpro_getMembershipLevelsForUser( $user_id );
+	// get level id
+	$level_id = $level_obj->ID;
 
-		// get level id
-	if ( is_array( $level ) ) {
-		$level_id = $level['membership_id'];    // custom level
-	} else {
-		$level_id = $level; // just id
+	// Remove other levels in group if necessary.
+	// TODO: FIX.
+	$allgroups = pmprommpu_get_groups();
+	$groupid = pmprommpu_get_group_for_level($level_id);
+	if(array_key_exists($groupid, $allgroups) && $allgroups[$groupid]->allow_multiple_selections<1) { // There can be only one.
+		// Do they already have one in this group?
+		$otherlevels = $wpdb->get_col( $wpdb->prepare( "SELECT mlg.level FROM {$wpdb->pmpro_membership_levels_groups} AS mlg WHERE mlg.group = %d AND mlg.level <>  %d", $groupid, $level_id ) );
+		if ( false !== pmpro_hasMembershipLevel( $otherlevels, $user_id ) ) { 
+			$cancel_level = 1;
+		}
 	}
 
 	/**
@@ -1024,7 +1014,7 @@ function pmpro_changeMembershipLevel( $level, $user_id = null, $old_level_status
 	do_action( 'pmpro_before_change_membership_level', $level_id, $user_id, $old_levels, $cancel_level );
 
 	// deactivate old memberships based on the old_level_status passed in (updates pmpro_memberships_users table)
-	$pmpro_deactivate_old_levels = true;
+	$pmpro_deactivate_old_levels = false;
 	/**
 	 * Filter whether old levels should be deactivated or not. This supports the MMPU addon.
 	 * Typically you'll want to hook into pmpro_before_change_membership_level
@@ -1034,79 +1024,12 @@ function pmpro_changeMembershipLevel( $level, $user_id = null, $old_level_status
 	 * @var $pmpro_deactivate_old_levels bool True or false if levels should be deactivated. Defaults to true.
 	 */
 	$pmpro_deactivate_old_levels = apply_filters( 'pmpro_deactivate_old_levels', $pmpro_deactivate_old_levels );
-
-	// make sure we deactivate the specified level if it's passed in
-	if ( ! empty( $cancel_level ) ) {
-		$pmpro_deactivate_old_levels = true;
-		$new_old_levels = array();
-		foreach ( $old_levels as $key => $old_level ) {
-			if ( $old_level->id == $cancel_level ) {
-				$new_old_levels[] = $old_levels[ $key ];
-				break;
-			}
-		}
-		$old_levels = $new_old_levels;
+	if ( $pmpro_deactivate_old_levels ) {
+		// TODO: Cancel only "cancel_level" instead?
+		pmpro_cancel_all_membership_levels( $user_id );
 	}
 
-	if ( $old_levels && $pmpro_deactivate_old_levels ) {
-		foreach ( $old_levels as $old_level ) {
-
-			$sql = "UPDATE $wpdb->pmpro_memberships_users SET `status`='$old_level_status', `enddate`='" . current_time( 'mysql' ) . "' WHERE `id`=" . $old_level->subscription_id;
-
-			if ( ! $wpdb->query( $sql ) ) {
-				$pmpro_error = __( 'Error interacting with database', 'paid-memberships-pro' ) . ': ' . ( $wpdb->last_error ? $wpdb->last_error : 'unavailable' );
-
-				return false;
-			}
-		}
-	}
-
-	// should we cancel their gateway subscriptions?
-	if ( ! empty( $cancel_level ) ) {
-		$pmpro_cancel_previous_subscriptions = true;    // don't filter cause we're doing just the one
-
-		$other_order_ids = $wpdb->get_col( "SELECT id FROM $wpdb->pmpro_membership_orders WHERE user_id = '" . $user_id . "' AND status = 'success' AND membership_id = '" . esc_sql( $cancel_level ) . "' ORDER BY id DESC LIMIT 1" );
-	} else {
-		$pmpro_cancel_previous_subscriptions = true;
-		if ( isset( $_REQUEST['cancel_membership'] ) && $_REQUEST['cancel_membership'] == false ) {
-			$pmpro_cancel_previous_subscriptions = false;
-		}
-		$pmpro_cancel_previous_subscriptions = apply_filters( 'pmpro_cancel_previous_subscriptions', $pmpro_cancel_previous_subscriptions );
-
-		$other_order_ids = $wpdb->get_col(
-			"SELECT id, IF(subscription_transaction_id = '', CONCAT('UNIQUE_SUB_ID_', id), subscription_transaction_id) as unique_sub_id
-											FROM $wpdb->pmpro_membership_orders
-											WHERE user_id = '" . $user_id . "'
-												AND status = 'success'
-											GROUP BY unique_sub_id
-											ORDER BY id DESC"
-		);
-	}
-
-	/**
-	 * Filter the other/old order ids in case we want to exclude some.
-	 * NOTE: As of version 2.0.3, includes/filters.php has code to
-	 * ignore the order for the current checkout.
-	 */
-	$other_order_ids = apply_filters( 'pmpro_other_order_ids_to_cancel', $other_order_ids );
-
-	// cancel any other subscriptions they have (updates pmpro_membership_orders table)
-	if ( $pmpro_cancel_previous_subscriptions && ! empty( $other_order_ids ) ) {
-		foreach ( $other_order_ids as $order_id ) {
-			$c_order = new MemberOrder( $order_id );
-			$c_order->cancel();
-
-			if ( ! empty( $c_order->error ) ) {
-				$pmpro_error = $c_order->error;
-			} else {
-				if( $old_level_status == 'error' ) {
-					$c_order->updateStatus("error");
-				}
-			}
-		}
-	}
-
-	// insert current membership
+	// Give the user the level.
 	if ( ! empty( $level ) ) {
 		// make sure the dates are in good formats
 		if ( is_array( $level ) ) {
@@ -1185,6 +1108,87 @@ function pmpro_changeMembershipLevel( $level, $user_id = null, $old_level_status
 	 */
 	do_action( 'pmpro_after_change_membership_level', $level_id, $user_id, $cancel_level );
 	return true;
+}
+
+/**
+ * Cancel a user's membership level.
+ *
+ * @since 1.8.11
+ */
+function pmpro_cancel_membership_level( $cancel_level, $user_id = null, $old_level_status = 'inactive' ) {
+	global $wpdb;
+	// TODO: Parse $cancel_level to make it nice.
+	// TODO: Add before/after_change_membership_level filters.
+	$old_levels = pmpro_getMembershipLevelsForUser( $user_id );
+
+	$sql = "UPDATE $wpdb->pmpro_memberships_users SET `status`='$old_level_status', `enddate`='" . current_time( 'mysql' ) . "' WHERE `id`=" . $old_level->subscription_id;
+	if ( ! $wpdb->query( $sql ) ) {
+		$pmpro_error = __( 'Error interacting with database', 'paid-memberships-pro' ) . ': ' . ( $wpdb->last_error ? $wpdb->last_error : 'unavailable' );
+		return false;
+	}
+
+	// should we cancel their gateway subscriptions?
+	if ( ! empty( $cancel_level ) ) {
+		$pmpro_cancel_previous_subscriptions = true;    // don't filter cause we're doing just the one
+
+		$other_order_ids = $wpdb->get_col( "SELECT id FROM $wpdb->pmpro_membership_orders WHERE user_id = '" . $user_id . "' AND status = 'success' AND membership_id = '" . esc_sql( $cancel_level ) . "' ORDER BY id DESC LIMIT 1" );
+	} else {
+		$pmpro_cancel_previous_subscriptions = true;
+		if ( isset( $_REQUEST['cancel_membership'] ) && $_REQUEST['cancel_membership'] == false ) {
+			$pmpro_cancel_previous_subscriptions = false;
+		}
+		$pmpro_cancel_previous_subscriptions = apply_filters( 'pmpro_cancel_previous_subscriptions', $pmpro_cancel_previous_subscriptions );
+
+		$other_order_ids = $wpdb->get_col(
+			"SELECT id, IF(subscription_transaction_id = '', CONCAT('UNIQUE_SUB_ID_', id), subscription_transaction_id) as unique_sub_id
+											FROM $wpdb->pmpro_membership_orders
+											WHERE user_id = '" . $user_id . "'
+												AND status = 'success'
+											GROUP BY unique_sub_id
+											ORDER BY id DESC"
+		);
+	}
+
+	/**
+	 * Filter the other/old order ids in case we want to exclude some.
+	 * NOTE: As of version 2.0.3, includes/filters.php has code to
+	 * ignore the order for the current checkout.
+	 */
+	$other_order_ids = apply_filters( 'pmpro_other_order_ids_to_cancel', $other_order_ids );
+
+	// cancel any other subscriptions they have (updates pmpro_membership_orders table)
+	if ( $pmpro_cancel_previous_subscriptions && ! empty( $other_order_ids ) ) {
+		foreach ( $other_order_ids as $order_id ) {
+			$c_order = new MemberOrder( $order_id );
+			$c_order->cancel();
+
+			if ( ! empty( $c_order->error ) ) {
+				$pmpro_error = $c_order->error;
+			} else {
+				if( $old_level_status == 'error' ) {
+					$c_order->updateStatus("error");
+				}
+			}
+		}
+	}
+
+	// remove cached level
+	global $all_membership_levels;
+	unset( $all_membership_levels[ $user_id ] );
+	
+	// remove levels cache for user
+	$cache_key = 'user_' . $user_id . '_levels';
+	wp_cache_delete( $cache_key, 'pmpro' );
+
+	// update user data and call action
+	pmpro_set_current_user();
+}
+
+function pmpro_cancel_all_membership_levels( $user_id = null, $old_level_status = 'inactive' ) {
+	$old_levels = pmpro_getMembershipLevelsForUser( $user_id );
+	foreach ( $old_levels as $level ) {
+		pmpro_cancel_membership_level( $level, $user_id, $old_level_status );
+	}
 }
 
 /**
@@ -3443,3 +3447,194 @@ function pmpro_doing_webhook( $gateway = null ){
 	}
 	
 }
+
+/*
+ * Return an array of all level groups, with the key being the level group id.
+ * Groups have an id, name, displayorder, and flag for allow_multiple_selections
+ */
+function pmpro_get_level_groups() {
+	global $wpdb;
+
+	$allgroups = $wpdb->get_results("SELECT * FROM $wpdb->pmpro_groups ORDER BY id");
+	$grouparr = array();
+	foreach($allgroups as $curgroup) {
+		$grouparr[$curgroup->id] = $curgroup;
+	}
+
+	return $grouparr;
+}
+/*
+ * Given a name and a true/false flag about whether it allows multiple selections, create a level group.
+ */
+function pmpro_create_level_group( $name, $allow_multiple = true ) {
+	global $wpdb;
+
+	$allowmult = intval($allow_multiple);
+	$result = $wpdb->insert($wpdb->pmpro_groups, array('name' => $name, 'allow_multiple_selections' => $allowmult), array('%s', '%d'));
+
+	if($result) { return $wpdb->insert_id; } else { return false; }
+}
+
+/*
+ * Set (or move) a membership level into a level group
+ */
+function pmpro_set_level_for_group($level_id, $group_id) {
+	global $wpdb;
+
+	$level_id = intval($level_id);
+	$group_id = intval($group_id); // just to be safe
+
+	// TODO: Error checking would be smart.
+	$wpdb->delete( $wpdb->pmpro_membership_levels_groups, array( 'level' => $level_id ) );
+	$wpdb->insert($wpdb->pmpro_membership_levels_groups, array('level' => $level_id, 'group' => $group_id), array('%d', '%d' ) );
+}
+
+/*
+ * Return an array of the groups and levels in display order.
+ * Keys are group ID, and values are their levels, in display order.
+ */
+ function pmpro_get_levels_and_groups_in_order( $include_hidden = false ) {
+	global $wpdb;
+
+	$retarray = array();
+
+	$pmpro_levels = pmpro_getAllLevels($include_hidden, true);
+	$pmpro_level_order = pmpro_getOption('level_order');
+	$pmpro_levels = apply_filters('pmpro_levels_array', $pmpro_levels );
+
+	$include = array();
+
+	foreach( $pmpro_levels as $level ) {
+		$include[] = $level->id;
+	}
+
+	$included = esc_sql( implode(',', $include) );
+
+	$order = array();
+	if(! empty($pmpro_level_order)) { $order = explode(',', $pmpro_level_order); }
+
+	$grouplist = $wpdb->get_col("SELECT id FROM {$wpdb->pmpro_groups} ORDER BY displayorder, id ASC");
+	if($grouplist) {
+		foreach($grouplist as $curgroup) {
+
+			$curgroup = intval($curgroup);
+
+			$levelsingroup = $wpdb->get_col(
+				$wpdb->prepare( "
+					SELECT level 
+					FROM {$wpdb->pmpro_membership_levels_groups} AS mlg 
+					INNER JOIN {$wpdb->pmpro_membership_levels} AS ml ON ml.id = mlg.level AND ml.allow_signups LIKE %s
+					WHERE mlg.group = %d 
+					AND ml.id IN (" . $included ." )
+					ORDER BY level ASC",
+				($include_hidden ? '%' : 1),
+				$curgroup
+				)
+			);
+
+			if(count($order)>0) {
+
+				$mylevels = array();
+
+				foreach($order as $level_id) {
+					if(in_array($level_id, $levelsingroup)) { $mylevels[] = $level_id; }
+				}
+
+				$retarray[$curgroup] = $mylevels;
+
+			} else {
+
+				$retarray[$curgroup] = $levelsingroup;
+			}
+		}
+	}
+
+	return $retarray;
+}
+
+/**
+ * Checks if a user has any membership level within a certain group
+ */
+function pmpro_has_membership_group($groups = NULL, $user_id = NULL) {
+	global $current_user, $wpdb;
+
+	//assume false
+	$return = false;
+
+	//default to current user
+	if(empty($user_id)) {
+		$user_id = $current_user->ID;
+	}
+
+	//get membership levels (or not) for given user
+	if(!empty($user_id) && is_numeric($user_id))
+		$membership_levels = pmpro_getMembershipLevelsForUser($user_id);
+	else
+		$membership_levels = NULL;
+
+	//make an array out of a single element so we can use the same code
+	if(!is_array($groups)) {
+		$groups = array($groups);
+	}
+
+	//no levels, so no groups
+	if(empty($membership_levels)) {
+		$return = false;
+	} else {
+		//we have levels, so test against groups given
+		foreach($groups as $group_id) {
+			foreach($membership_levels as $level) {
+				$levelgroup = pmpro_get_group_for_level($level->id);
+				if($levelgroup == $group_id) {
+					$return = true;	//found one!
+					break 2;
+				}
+			}
+		}
+	}
+
+	//filter just in case
+	$return = apply_filters("pmprommpu_has_membership_group", $return, $user_id, $groups); // Old filter.
+	$return = apply_filters("pmpro_has_membership_group", $return, $user_id, $groups);
+	return $return;
+}
+
+/*
+ * Given a level ID, this function returns the group ID it belongs to.
+ */
+function pmpro_get_group_for_level( $level_id ) {
+	global $wpdb;
+
+	$level_id = intval($level_id); // just to be safe
+
+	$groupid = $wpdb->get_var( $wpdb->prepare( "SELECT mlg.group FROM {$wpdb->pmpro_membership_levels_groups} mlg WHERE level = %d", $level_id ) );
+	if($groupid) {
+		$groupid = intval($groupid);
+	} else {
+		$groupid = -1;
+	}
+	return $groupid;
+}
+
+/*
+ * Given a level ID and new group ID, this function sets the group ID for a level.
+ * Returns a success flag (true/false).
+ */
+function pmpro_set_group_for_level($level_id, $group_id) {
+	global $wpdb;
+
+	$level_id = intval($level_id); // just to be safe
+	$group_id = intval($group_id); // just to be safe
+
+	// TODO: Error checking would be smart.
+	$wpdb->delete( $wpdb->pmpro_membership_levels_groups, array( 'level' => $level_id ) );
+
+	$success = $wpdb->insert( $wpdb->pmpro_membership_levels_groups, array('group' => $group_id, 'level' => $level_id ) );
+
+	if($success>0) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
