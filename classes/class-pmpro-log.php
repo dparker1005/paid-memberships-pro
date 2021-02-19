@@ -38,7 +38,11 @@ class PMPro_Log {
 		}
 
 		// Get entries from database.
-		$this->entries = get_option( 'pmpro_log_' . $this->slug, array() );
+		$this->entries = get_option( 'pmpro_log_' . $this->slug, );
+		if ( empty( $this->entries ) ) {
+			$this->entries = array();
+		}
+
 		if ( 0 !== $this->max_entries ) {
 			$this->entries = array_slice( $this->entries, $this->max_entries * -1 , $this->max_entries );
 		}
@@ -54,7 +58,7 @@ class PMPro_Log {
 		if ( 0 !== $this->max_entries ) {
 			$this->entries = array_slice( $this->entries, $this->max_entries * -1 , $this->max_entries );
 		}
-		$this->entries = update_option( 'pmpro_log_' . $this->slug, $this->entries );
+		update_option( 'pmpro_log_' . $this->slug, $this->entries );
 	}
 
 	public function add_entry( $message, $tags = array() ) {
