@@ -62,6 +62,11 @@ class PMPro_Log {
 			// Log is not enabled. Do nothing.
 			return;
 		}
+
+		if ( is_string( $tags ) ) {
+			$tags = array( $tags );
+		}
+
 		$this->pull_entries();
 		$this->entries[] = array(
 			'timestamp' => date('Y-m-d H:i:s'),
