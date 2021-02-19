@@ -196,3 +196,72 @@ function pmpro_stripe_check_api_keys() {
         jQuery('#pmpro_stripe_create_webhook').addClass('disabled');
     }
 }
+
+/** JQuery to hide the notifications. */
+jQuery(document).ready(function(){
+	// Check that we are on payment settings page.
+	if ( ! jQuery( '#log_slug' ).length || ! jQuery( '#log_output' ).length || ! jQuery( '#log_clear' ).length || ! jQuery( '#log_refresh' ).length ) {
+		return;
+	}
+
+	var log_slug = jQuery( '#log_slug' ).html();
+	var entries  = [];
+
+	function pmpro_update_log_ouptut() {
+		var output = '';
+		var selected_tag = jQuery( '#log_filter' ).val();
+		for (var i = entries.length-1; i >= 0; i--) {
+			if ( selected_tag && ! entries[i].tags.includes( selected_tag ) ) {
+				// Hidden by filter.
+				continue;
+			}
+			output += '----------------\n';
+			output += 'Logged on ' + entries[i].timestamp + '\n';
+			output += 'Tags: ' + entries[i].tags.join( ', ' ) + '\n';
+			output += 'Message:\n' + entries[i].message + '\n\n';
+		}
+		jQuery( '#log_output' ).val( output );
+	}
+
+	jQuery( '#log_filter' ).change( function() {
+		pmpro_update_log_ouptut();
+	});
+
+	function pmpro_refresh_log() {
+		var postData = {
+			action: 'pmpro_log_get_entries_json',
+			log_slug: log_slug,
+		}
+
+		jQuery.ajax({
+			type: "POST",
+			data: postData,
+			url: ajaxurl,
+			success: function( response ) {
+				entries = jQuery.parseJSON( response );
+				pmpro_update_log_ouptut();
+			}
+		});
+	}
+	pmpro_refresh_log();
+
+	jQuery( '#log_refresh' ).click( function() {
+		pmpro_refresh_log();
+	});
+
+	jQuery( '#log_clear' ).click( function() {
+		var postData = {
+			action: 'pmpro_log_clear',
+			log_slug: log_slug,
+		}
+		jQuery.ajax({
+			type: "POST",
+			data: postData,
+			url: ajaxurl,
+			success: function( response ) {
+				entries = jQuery.parseJSON( response );
+				pmpro_update_log_ouptut();
+			}
+		});
+	});
+});

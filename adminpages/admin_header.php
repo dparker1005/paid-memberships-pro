@@ -212,6 +212,7 @@
 			'pmpro-paymentsettings',
 			'pmpro-emailsettings',
 			'pmpro-advancedsettings',
+			'pmpro-logs',
 			'pmpro-addons',
 			'pmpro-license'
 		);
@@ -246,7 +247,7 @@
 		<?php } ?>
 	</nav>
 
-	<?php if( $view == 'pmpro-membershiplevels' || $view == 'pmpro-discountcodes' || $view == 'pmpro-pagesettings' || $view == 'pmpro-paymentsettings' || $view == 'pmpro-emailsettings' || $view == 'pmpro-advancedsettings' ) { ?>
+	<?php if( $view == 'pmpro-membershiplevels' || $view == 'pmpro-discountcodes' || $view == 'pmpro-pagesettings' || $view == 'pmpro-paymentsettings' || $view == 'pmpro-emailsettings' || $view == 'pmpro-advancedsettings' || $view == 'pmpro-logs' ) { ?>
 		<ul class="subsubsub">
 			<?php if(current_user_can('pmpro_membershiplevels')) { ?>
 				<li><a href="<?php echo admin_url('admin.php?page=pmpro-membershiplevels');?>" title="<?php _e('Membership Levels', 'paid-memberships-pro' );?>" class="<?php if($view == 'pmpro-membershiplevels') { ?>current<?php } ?>"><?php _e('Levels', 'paid-memberships-pro' );?></a>&nbsp;|&nbsp;</li>
@@ -269,7 +270,11 @@
 			<?php } ?>
 
 			<?php if(current_user_can('pmpro_advancedsettings')) { ?>
-				<li><a href="<?php echo admin_url('admin.php?page=pmpro-advancedsettings');?>" title="<?php _e('Advanced Settings', 'paid-memberships-pro' );?>" class="<?php if($view == 'pmpro-advancedsettings') { ?>current<?php } ?>"><?php _e('Advanced', 'paid-memberships-pro' );?></a></li>
+				<li><a href="<?php echo admin_url('admin.php?page=pmpro-advancedsettings');?>" title="<?php _e('Advanced Settings', 'paid-memberships-pro' );?>" class="<?php if($view == 'pmpro-advancedsettings') { ?>current<?php } ?>"><?php _e('Advanced', 'paid-memberships-pro' );?></a>&nbsp;|&nbsp;</li>
+			<?php } ?>
+
+			<?php if(current_user_can('pmpro_logs')) { ?>
+				<li><a href="<?php echo admin_url('admin.php?page=pmpro-logs');?>" title="<?php _e('Logs', 'paid-memberships-pro' );?>" class="<?php if($view == 'pmpro-logs') { ?>current<?php } ?>"><?php _e('Logs', 'paid-memberships-pro' );?></a></li>
 			<?php } ?>
 		</ul>
 		<br class="clear" />

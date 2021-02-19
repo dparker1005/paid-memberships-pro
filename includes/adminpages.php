@@ -11,12 +11,13 @@ function pmpro_getPMProCaps() {
 		'pmpro_paymentsettings',
 		'pmpro_emailsettings',
 		'pmpro_advancedsettings',
+		'pmpro_logs',
 		'pmpro_addons',
 		'pmpro_memberslist',
 		'pmpro_reports',
 		'pmpro_orders',
 		'pmpro_discountcodes',
-		'pmpro_updates'
+		'pmpro_updates',
 	);
 
 	return $pmpro_caps;
@@ -69,6 +70,7 @@ function pmpro_add_pages() {
 	add_submenu_page( 'admin.php', __( 'Payment Settings', 'paid-memberships-pro' ), __( 'Payment Settings', 'paid-memberships-pro' ), 'pmpro_paymentsettings', 'pmpro-paymentsettings', 'pmpro_paymentsettings' );
 	add_submenu_page( 'admin.php', __( 'Email Settings', 'paid-memberships-pro' ), __( 'Email Settings', 'paid-memberships-pro' ), 'pmpro_emailsettings', 'pmpro-emailsettings', 'pmpro_emailsettings' );
 	add_submenu_page( 'admin.php', __( 'Advanced Settings', 'paid-memberships-pro' ), __( 'Advanced Settings', 'paid-memberships-pro' ), 'pmpro_advancedsettings', 'pmpro-advancedsettings', 'pmpro_advancedsettings' );
+	add_submenu_page( 'admin.php', __( 'Logs', 'paid-memberships-pro' ), __( 'Logs', 'paid-memberships-pro' ), 'pmpro_logs', 'pmpro-logs', 'pmpro_logs' );
 
 	add_action( 'load-' . $list_table_hook, 'pmpro_list_table_screen_options' );
 
@@ -92,6 +94,7 @@ function pmpro_parent_file( $parent_file ) {
 		'pmpro-paymentsettings',
 		'pmpro-emailsettings',
 		'pmpro-advancedsettings',
+		'pmpro-logs',
 	);
 	
 	if( isset( $_REQUEST['page']) && in_array( $_REQUEST['page'], $pmpro_settings_tabs ) ) {
@@ -274,6 +277,10 @@ function pmpro_emailsettings() {
 
 function pmpro_advancedsettings() {
 	require_once( PMPRO_DIR . '/adminpages/advancedsettings.php' );
+}
+
+function pmpro_logs() {
+	require_once( PMPRO_DIR . '/adminpages/logs.php' );
 }
 
 function pmpro_addons() {
