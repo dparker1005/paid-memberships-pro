@@ -40,7 +40,7 @@ function pmpro_get_settings_for_log( $log_slug ) {
 			'max_entries' => 0,
 		),
 	);
-	$log_settings = array_merge( $all_logs[ $log_slug ]['defaults'], $log_settings );
+	$log_settings = array_merge( $global_defaults, $log_settings );
 	return $log_settings;
 }
 
