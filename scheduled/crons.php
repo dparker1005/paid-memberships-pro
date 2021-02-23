@@ -20,12 +20,17 @@ function pmpro_cron_expire_memberships()
 
 	$expired = $wpdb->get_results($sqlQuery);
 
+	$log = new PMPro_Log( 'expiration_cron' );
+	$log->add_entry( count( $expired ) . ' user(s) to be expired.', 'cron_started' );
+
 	foreach($expired as $e)
 	{
 		do_action("pmpro_membership_pre_membership_expiry", $e->user_id, $e->membership_id );
 
 		//remove their membership
 		pmpro_changeMembershipLevel(false, $e->user_id, 'expired', $e->membership_id);
+
+		$log->add_entry( 'Removed level ID ' . $e->membership_id . ' from user ID ' . $e->user_id . ' who had an expiration date of ' . $e->enddate , 'user_expired' );
 
 		do_action("pmpro_membership_post_membership_expiry", $e->user_id, $e->membership_id );
 
@@ -46,6 +51,7 @@ function pmpro_cron_expire_memberships()
 			}
 		}
 	}
+	$log->add_entry( '', 'cron_ended' );
 }
 
 /*

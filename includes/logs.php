@@ -4,7 +4,15 @@ function pmpro_get_logs() {
 	static $logs;
 	if ( empty( $logs ) ) {
 		$default_logs = array(
-			
+			'expiration_cron' => array(
+				'defaults'   => array(
+					'enabled'     => true,
+					'max_entries' => 1000,
+				),
+				'valid_tags' => array(
+					'cron_started', 'user_expired', 'cron_ended'
+				)
+			)
 		);
 		$logs = apply_filters( 'pmpro_logs', $default_logs );
 	}
