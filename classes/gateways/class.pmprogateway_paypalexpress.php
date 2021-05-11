@@ -38,7 +38,6 @@
 
 			/*
 				This code is the same for PayPal Website Payments Pro, PayPal Express, and PayPal Standard
-				So we only load it if we haven't already.
 			*/
 			global $pmpro_payment_option_fields_for_paypal;
 			if(empty($pmpro_payment_option_fields_for_paypal))

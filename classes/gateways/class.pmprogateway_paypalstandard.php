@@ -34,13 +34,13 @@
 			add_filter('pmpro_payment_options', array('PMProGateway_paypalstandard', 'pmpro_payment_options'));
 
 			/*
-				This code is the same for PayPal Website Payments Pro, PayPal Express, and PayPal Standard
-				So we only load it if we haven't already.
+				This code is the same for PayPal Website Payments Pro, PayPal Express, and PayPal Standard.
+				We are storing it in the PayPal Express class.
 			*/
 			global $pmpro_payment_option_fields_for_paypal;
 			if(empty($pmpro_payment_option_fields_for_paypal))
 			{
-				add_filter('pmpro_payment_option_fields', array('PMProGateway_paypalstandard', 'pmpro_payment_option_fields'), 10, 2);
+				add_filter('pmpro_payment_option_fields', array('PMProGateway_paypalexpress', 'pmpro_payment_option_fields'), 10, 2);
 				$pmpro_payment_option_fields_for_paypal = true;
 			}
 
@@ -114,82 +114,6 @@
 			$options = array_merge($paypal_options, $options);
 
 			return $options;
-		}
-
-		/**
-		 * Display fields for this gateway's options.
-		 *
-         * @param array     $values
-         * @param string    $gateway
-         *
-		 * @since 1.8
-		 */
-		static function pmpro_payment_option_fields($values, $gateway)
-		{
-		?>
-		<tr class="pmpro_settings_divider gateway gateway_paypal gateway_paypalexpress gateway_paypalstandard" <?php if($gateway != "paypal" && $gateway != "paypalexpress" && $gateway != "paypalstandard") { ?>style="display: none;"<?php } ?>>
-			<td colspan="2">
-				<hr />
-				<h3><?php _e('PayPal Settings', 'paid-memberships-pro' ); ?></h3>
-			</td>
-		</tr>
-		<tr class="gateway gateway_paypalstandard" <?php if($gateway != "paypalstandard") { ?>style="display: none;"<?php } ?>>
-			<td colspan="2" style="padding: 0px;">
-				<p class="pmpro_message">
-				<?php
-					$allowed_message_html = array (
-						'a' => array (
-							'href' => array(),
-							'target' => array(),
-							'title' => array(),
-						),
-					);
-					echo sprintf( wp_kses( __( 'Note: We do not recommend using PayPal Standard. We suggest using PayPal Express, Website Payments Pro (Legacy), or PayPal Pro (Payflow Pro). <a target="_blank" href="%s" title="More information on why can be found here">More information on why can be found here</a>.', 'paid-memberships-pro' ), $allowed_message_html ), 'https://www.paidmembershipspro.com/read-using-paypal-standard-paid-memberships-pro/?utm_source=plugin&utm_medium=pmpro-paymentsettings&utm_campaign=blog&utm_content=read-using-paypal-standard-paid-memberships-pro' );
-				?>
-				</p>
-			</td>
-		</tr>
-		<tr class="gateway gateway_paypal gateway_paypalexpress gateway_paypalstandard" <?php if($gateway != "paypal" && $gateway != "paypalexpress" && $gateway != "paypalstandard") { ?>style="display: none;"<?php } ?>>
-			<th scope="row" valign="top">
-				<label for="gateway_email"><?php _e('Gateway Account Email', 'paid-memberships-pro' );?>:</label>
-			</th>
-			<td>
-				<input type="text" id="gateway_email" name="gateway_email" size="60" value="<?php echo esc_attr($values['gateway_email'])?>" />
-			</td>
-		</tr>
-		<tr class="gateway gateway_paypal gateway_paypalexpress" <?php if($gateway != "paypal" && $gateway != "paypalexpress") { ?>style="display: none;"<?php } ?>>
-			<th scope="row" valign="top">
-				<label for="apiusername"><?php _e('API Username', 'paid-memberships-pro' );?>:</label>
-			</th>
-			<td>
-				<input type="text" id="apiusername" name="apiusername" size="60" value="<?php echo esc_attr($values['apiusername'])?>" />
-			</td>
-		</tr>
-		<tr class="gateway gateway_paypal gateway_paypalexpress" <?php if($gateway != "paypal" && $gateway != "paypalexpress") { ?>style="display: none;"<?php } ?>>
-			<th scope="row" valign="top">
-				<label for="apipassword"><?php _e('API Password', 'paid-memberships-pro' );?>:</label>
-			</th>
-			<td>
-				<input type="text" id="apipassword" name="apipassword" size="60" value="<?php echo esc_attr($values['apipassword'])?>" />
-			</td>
-		</tr>
-		<tr class="gateway gateway_paypal gateway_paypalexpress" <?php if($gateway != "paypal" && $gateway != "paypalexpress") { ?>style="display: none;"<?php } ?>>
-			<th scope="row" valign="top">
-				<label for="apisignature"><?php _e('API Signature', 'paid-memberships-pro' );?>:</label>
-			</th>
-			<td>
-				<input type="text" id="apisignature" name="apisignature" size="60" value="<?php echo esc_attr($values['apisignature'])?>" />
-			</td>
-		</tr>
-		<tr class="gateway gateway_paypal gateway_paypalexpress gateway_paypalstandard" <?php if($gateway != "paypal" && $gateway != "paypalexpress" && $gateway != "paypalstandard") { ?>style="display: none;"<?php } ?>>
-			<th scope="row" valign="top">
-				<label><?php _e('IPN Handler URL', 'paid-memberships-pro' );?>:</label>
-			</th>
-			<td>
-				<p><?php _e('Here is your IPN URL for reference. You SHOULD NOT set this in your PayPal settings.', 'paid-memberships-pro' );?> <pre><?php echo add_query_arg( 'action', 'ipnhandler', admin_url('admin-ajax.php') );?></pre></p>
-			</td>
-		</tr>
-		<?php
 		}
 
 		/**
