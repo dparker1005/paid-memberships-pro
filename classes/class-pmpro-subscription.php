@@ -461,8 +461,32 @@ class PMPro_Subscription {
 
 		if ( $new_subscription->status === 'active' && empty( $new_subscription->next_payment_date ) ) {
 			// Calculate their next payment date based on their current membership.
-			// TODO: Implement this.
 
+			// TODO: Implement this.
+			// If we are at checkout, we may be able to do something clever to get their first recurring payment date.
+			if ( pmpro_isCheckout() ) {
+				// Actually do we even need to be this clever or can we let the below case handle it?
+			}
+
+			// Otherwise, we can get the next payment date from the user's order history and membership information.
+			if ( empty( $next_payment_date ) ) {
+				// Get their most recent order for this level so that we can calculate the next payment date from the order date.
+				$most_recent_order_for_level = $wpdb->get_row( $wpdb->prepare( "SELECT * 
+						FROM $wpdb->pmpro_membership_orders
+						WHERE subscription_transaction_id = %s
+						AND gateway = %s
+						AND gateway_environment = %s
+						ORDER BY timestamp DESC", $subscription_transaction_id, $gateway, $gateway_environment ), OBJECT );
+				if ( ! empty( $most_recent_order_for_level->timestamp ) ) {
+					// Get the user's membership level so that we can get their billing information.
+					// Note, this info will soon be stored in the subscription object.
+					$membership_level = pmpro_getSpecificMembershipLevelForUser( $membership_level_id, $user_id );
+					if ( ! empty( $membership_level ) && ! empty( $membership_level->cycle_number ) ) {
+						// TODO: Maybe handle trials.
+						$new_subscription->next_payment_date = strtotime( "+{$membership_level->cycle_number} {$membership_level->cycle_period}", $most_recent_order_for_level->timestamp );
+					}
+				}
+			}
 		}
 
 		if ( $new_subscription->status !== 'active' && empty( $new_subscription->enddate ) ) {
