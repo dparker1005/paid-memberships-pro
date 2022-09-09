@@ -80,6 +80,7 @@ require_once( PMPRO_DIR . '/includes/privacy.php' );                // code to a
 require_once( PMPRO_DIR . '/includes/pointers.php' );				// popover help pointers
 require_once( PMPRO_DIR . '/includes/spam.php' );					// code to combat spam of various kinds
 require_once( PMPRO_DIR . '/includes/checkout.php' );		        // Common functions used at checkout.
+require_once( PMPRO_DIR . '/includes/cache-exclusions.php' );	    // Exclude PMPro and restricted content from caching.
 
 require_once( PMPRO_DIR . '/includes/xmlrpc.php' );                 // xmlrpc methods
 require_once( PMPRO_DIR . '/includes/rest-api.php' );               // rest API endpoints
