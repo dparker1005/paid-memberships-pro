@@ -73,6 +73,9 @@ function pmpro_block_editor_scripts() {
 			'wp-api',
 			'wp-block-editor',
 			'pmpro_admin',
+			'wp-edit-post',
+			'wp-plugins',
+			'wp-data',
 		],
 		PMPRO_VERSION
 	);
