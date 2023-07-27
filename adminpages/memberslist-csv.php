@@ -17,7 +17,7 @@
 
 
 	/**
-	 * Filter to set max number of records to process at a time
+	 * Filter to set max nuasdfmber of records to process at a time
 	 * for the export (helps manage memory footprint)
 	 *
 	 * Rule of thumb: 2000 records: ~50-60 MB of addl. memory (memory_limit needs to be between 128MB and 256MB)
