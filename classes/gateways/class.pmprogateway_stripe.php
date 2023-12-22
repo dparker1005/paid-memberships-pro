@@ -160,12 +160,6 @@ class PMProGateway_stripe extends PMProGateway {
 					'PMProGateway_stripe',
 					'pmpro_include_payment_information_fields'
 				) );
-
-				//make sure we clean up subs we will be cancelling after checkout before processing
-				add_action( 'pmpro_checkout_before_processing', array(
-					'PMProGateway_stripe',
-					'pmpro_checkout_before_processing'
-				) );
 			} else {
 				// Checkout flow for Stripe Checkout.
 				add_filter('pmpro_include_payment_information_fields', array('PMProGateway_stripe', 'show_stripe_checkout_pending_warning'));
@@ -1058,9 +1052,13 @@ class PMProGateway_stripe extends PMProGateway {
 	 * This prevents double billing issues in cases where Stripe has pending invoices
 	 * because of an expired credit card/etc and a user checks out to renew their subscription
 	 * instead of updating their billing information via the billing info page.
+	 *
+	 * @deprecated TBD
 	 */
 	public static function pmpro_checkout_before_processing() {
 		global $wpdb, $current_user;
+
+		_deprecated_function( __FUNCTION__, 'TBD' );
 
 		// we're only worried about cases where the user is logged in
 		if ( ! is_user_logged_in() ) {
