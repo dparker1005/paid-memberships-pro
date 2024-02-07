@@ -455,8 +455,10 @@
 		 *
 		 */
 		public static function get_orders( array $args = array() ) {
-
 			global $wpdb;
+
+			// Cache of orders that we've already retrieved this page load to avoid duplicate queries.
+			static $cached_orders = array();
 
 			$sql_query = "SELECT `id` FROM `$wpdb->pmpro_membership_orders`";
 
@@ -602,11 +604,14 @@
 			$member_orders = array();
 
 			foreach ( $member_order_ids as $member_order_id ) {
-				$morder = new MemberOrder( $member_order_id );
+				// If we haven't already retrieved this order, do so now.
+				if ( ! isset( $cached_orders[ $member_order_id ] ) ) {
+					$cached_orders[ $member_order_id ] = new MemberOrder( $member_order_id );
+				}
 
-				// Make sure the subscription object is valid.
-				if ( ! empty( $morder->id ) ) {
-					$member_orders[] = $morder;
+				// Make sure the order object is complete.
+				if ( ! empty( $cached_orders[ $member_order_id ]->id ) ) {
+					$member_orders[] = $cached_orders[ $member_order_id ];
 				}
 			}
 
@@ -676,7 +681,7 @@
 				$this->Address1 = $this->billing->street;
 
 				//get email from user_id
-				$this->Email = $wpdb->get_var( $wpdb->prepare( "SELECT user_email FROM $wpdb->users WHERE ID = %d LIMIT 1", $this->user_id ) );
+				$this->Email = $this->getUser()->user_email;
 
 				$this->subtotal = $dbobj->subtotal;
 				$this->tax = (float)$dbobj->tax;
@@ -1037,19 +1042,11 @@
 		/**
 		 * Get a user object for the user associated with this order.
 		 */
-		function getUser()
-		{
+		function getUser() {
 			global $wpdb;
 
-			if(!empty($this->user))
-				return $this->user;
-
-			
-			$this->user = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $wpdb->users WHERE ID = %d LIMIT 1", $this->user_id ) );
-			
-			// Fix the timestamp for local time 
-			if ( ! empty( $this->user ) && ! empty( $this->user->user_registered ) ) {
-				$this->user->user_registered = strtotime( get_date_from_gmt( $this->user->user_registered, 'Y-m-d H:i:s' ) );
+			if ( empty( $this->user ) ) {
+				$this->user = get_userdata( $this->user_id );
 			}
 
 			return $this->user;
@@ -1586,7 +1583,7 @@
 					$this->Zip         = $last_subscription_order->billing->zip;
 					$this->CountryCode = $last_subscription_order->billing->country;
 					$this->PhoneNumber = $last_subscription_order->billing->phone;
-					$this->Email       = $wpdb->get_var( $wpdb->prepare( "SELECT user_email FROM $wpdb->users WHERE ID = %d LIMIT 1", $this->user_id ) );
+					$this->Email       = $this->getUser()->user_email;
 
 					$this->billing          = new stdClass();
 					$this->billing->name    = $last_subscription_order->billing->name;
@@ -1604,7 +1601,7 @@
 					$this->Zip         = get_user_meta( $this->user_id, "pmpro_bzipcode", true );
 					$this->CountryCode = get_user_meta( $this->user_id, "pmpro_bcountry", true );
 					$this->PhoneNumber = get_user_meta( $this->user_id, "pmpro_bphone", true );
-					$this->Email       = $wpdb->get_var( $wpdb->prepare( "SELECT user_email FROM $wpdb->users WHERE ID = %d LIMIT 1", $this->user_id ) );
+					$this->Email       = $this->getUser()->user_email;
 
 					$this->billing          = new stdClass();
 					$this->billing->name    = get_user_meta( $this->user_id, "pmpro_bfirstname", true ) . " " . get_user_meta( $this->user_id, "pmpro_blastname", true ) ;

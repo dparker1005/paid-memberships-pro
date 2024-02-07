@@ -322,6 +322,9 @@ class PMPro_Subscription {
 	public static function get_subscriptions( array $args = [] ) {
 		global $wpdb;
 
+		// Cache of subscriptions that we've already retrieved this page load to avoid duplicate queries.
+		static $cached_subscriptions = array();
+
 		$sql_query = "SELECT `id` FROM `$wpdb->pmpro_subscriptions`";
 
 		$prepared = [];
@@ -510,11 +513,14 @@ class PMPro_Subscription {
 		$subscriptions = [];
 
 		foreach ( $subscription_ids as $subscription_id ) {
-			$subscription = new PMPro_Subscription( $subscription_id );
+			// If we haven't already retrieved this subscription, do so now.
+			if ( ! isset( $cached_subscriptions[ $subscription_id ] ) ) {
+				$cached_subscriptions[ $subscription_id ] = new PMPro_Subscription( $subscription_id );
+			}
 
-			// Make sure the subscription object is valid.
-			if ( ! empty( $subscription->id ) ) {
-				$subscriptions[] = $subscription;
+			// Make sure the subscription object is complete.
+			if ( ! empty( $cached_subscriptions[ $subscription_id ]->id ) ) {
+				$subscriptions[] = $cached_subscriptions[ $subscription_id ];
 			}
 		}
 
@@ -990,7 +996,7 @@ class PMPro_Subscription {
 		$orders = [];
 
 		foreach ( $order_ids as $order_id ) {
-			$order = new MemberOrder( $order_id );
+			$order = MemberOrder::get_order( $order_id );
 
 			// Make sure the order object is valid.
 			if ( ! empty( $order->id ) ) {

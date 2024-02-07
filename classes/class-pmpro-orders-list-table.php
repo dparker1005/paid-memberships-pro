@@ -436,9 +436,7 @@ class PMPro_Orders_List_Table extends WP_List_Table {
 			$order_ids = $wpdb->get_col( $sqlQuery );
 			$order_data = array();
 			foreach ( $order_ids as $order_id ) {
-				$order            = new MemberOrder();
-				$order->nogateway = true;
-				$order->getMemberOrderByID( $order_id );
+				$order = MemberOrder::get_order( $order_id );
 				$order->getUser();
 
 				$order_data[] = $order;
