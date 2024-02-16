@@ -1489,9 +1489,11 @@
 
 		/**
 		 * Call the getSubscriptionStatus method of the gateway class.
+		 *
+		 * @deprecated TBD
 		 */
-		function getGatewaySubscriptionStatus()
-		{
+		function getGatewaySubscriptionStatus() {
+			_deprecated_function( __METHOD__, 'TBD' );
 			if (is_object($this->Gateway)) {
 				return $this->Gateway->getSubscriptionStatus( $this );
 			}
@@ -1499,9 +1501,11 @@
 
 		/**
 		 * Call the getTransactionStatus method of the gateway class.
+		 *
+		 * @deprecated TBD
 		 */
-		function getGatewayTransactionStatus()
-		{
+		function getGatewayTransactionStatus() {
+			_deprecated_function( __METHOD__, 'TBD' );
 			if (is_object($this->Gateway)) {
 				return $this->Gateway->getTransactionStatus( $this );
 			}

@@ -1123,7 +1123,9 @@
 				if(!empty($order->id) && !empty($order->subscription_transaction_id) && $order->gateway == "paypalexpress")
 				{
 					//get the subscription status
-					$status = $order->getGatewaySubscriptionStatus();
+					//$status = $order->getGatewaySubscriptionStatus();
+					$ppe_gatweay = new PMProGateway_paypalexpress();
+					$status = $ppe_gatweay->getSubscriptionStatus( $order );
 
 					if(!empty($status) && !empty($status['NEXTBILLINGDATE']))
 					{
