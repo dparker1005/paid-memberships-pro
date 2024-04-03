@@ -431,7 +431,8 @@
 						$morder->TrialAmount = pmpro_round_price( $pmpro_level->trial_amount );
 					}
 
-					if($morder->confirm())
+					$gateway_object = new PMProGateway_paypalexpress();
+					if( $gateway_object->confirm( $morder) )
 					{
 						$pmpro_confirmed = true;
 					}

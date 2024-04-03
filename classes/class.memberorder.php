@@ -1572,9 +1572,11 @@
 		 * For offsite gateways with a confirm step.
 		 *
 		 * @since 1.8
+		 * @deprecated TBD This method was only used by PPE.
 		 */
 		function confirm()
 		{
+			_deprecated_function( __METHOD__, 'TBD' );
 			if (is_object($this->Gateway)) {
 				return $this->Gateway->confirm($this);
 			}
