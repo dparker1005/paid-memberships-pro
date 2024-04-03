@@ -939,8 +939,12 @@ class PMProGateway_authorizenet extends PMProGateway
 		}
 	}
 
+	/**
+	 * @deprecated TBD Use PMPro_Subscription instead.
+	 */
 	function getSubscriptionStatus(&$order)
 	{
+		_deprecated_function( __METHOD__, 'TBD' );
 		//define variables to send
 		if(!empty($order->subscription_transaction_id))
 			$subscriptionId = $order->subscription_transaction_id;

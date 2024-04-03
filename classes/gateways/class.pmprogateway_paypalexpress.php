@@ -914,8 +914,13 @@
 			return ( 'SUCCESS' == strtoupper( $this->httpParsedResponseAr['ACK'] ) || 'SUCCESSWITHWARNING' == strtoupper( $this->httpParsedResponseAr['ACK'] ) );
 		}
 
+		/**
+		 * @deprecated TBD Use PMPro_Subscription instead.
+		 */
 		function getSubscriptionStatus(&$order)
 		{
+			_deprecated_function( __METHOD__, 'TBD' );
+
 			if(empty($order->subscription_transaction_id))
 				return false;
 
@@ -995,8 +1000,12 @@
 				return __( 'Subscription could not be found.', 'paid-memberships-pro' );
 			}
 		}
-		
+
+		/**
+		 * @deprecated TBD
+		 */
 		function getTransactionStatus(&$order) {
+			_deprecated_function( __METHOD__, 'TBD' );
 			$transaction_details = $order->Gateway->getTransactionDetailsByOrder( $order );
 			if( false === $transaction_details ){
 				return false;

@@ -1,222 +1,57 @@
 <?php	
 	//require_once(dirname(__FILE__) . "/class.pmprogateway.php");
 	#[AllowDynamicProperties]
-	class PMProGateway
-	{	
-		function __construct($gateway = NULL)
-		{
-			$this->gateway = $gateway;
-			return $this->gateway;
-		}										
-		
-		function process(&$order)
-		{
-			//check for initial payment
-			if(floatval($order->InitialPayment) == 0)
-			{
-				//auth first, then process
-				if($this->authorize($order))
-				{						
-					$this->void($order);										
-					if(!pmpro_isLevelTrial($order->membership_level))
-					{
-						//subscription will start today with a 1 period trial
-						$order->ProfileStartDate = date_i18n("Y-m-d\TH:i:s");
-						$order->TrialBillingPeriod = $order->BillingPeriod;
-						$order->TrialBillingFrequency = $order->BillingFrequency;													
-						$order->TrialBillingCycles = 1;
-						$order->TrialAmount = 0;
-						
-						//add a billing cycle to make up for the trial, if applicable
-						if(!empty($order->TotalBillingCycles))
-							$order->TotalBillingCycles++;
-					}
-					elseif($order->InitialPayment == 0 && $order->TrialAmount == 0)
-					{
-						//it has a trial, but the amount is the same as the initial payment, so we can squeeze it in there
-						$order->ProfileStartDate = date_i18n("Y-m-d\TH:i:s");														
-						$order->TrialBillingCycles++;
-						
-						//add a billing cycle to make up for the trial, if applicable
-						if($order->TotalBillingCycles)
-							$order->TotalBillingCycles++;
-					}
-					else
-					{
-						//add a period to the start date to account for the initial payment
-						$order->ProfileStartDate = date_i18n("Y-m-d\TH:i:s", strtotime("+ " . $order->BillingFrequency . " " . $order->BillingPeriod, current_time("timestamp")));
-					}
-					
-					$order->ProfileStartDate = apply_filters("pmpro_profile_start_date", $order->ProfileStartDate, $order);
-					return $this->subscribe($order);
-				}
-				else
-				{
-					if(empty($order->error))
-						$order->error = __("Unknown error: Authorization failed.", 'paid-memberships-pro' );
-					return false;
-				}
-			}
-			else
-			{
-				//charge first payment
-				if($this->charge($order))
-				{							
-					//set up recurring billing					
-					if(pmpro_isLevelRecurring($order->membership_level))
-					{						
-						if(!pmpro_isLevelTrial($order->membership_level))
-						{
-							//subscription will start today with a 1 period trial
-							$order->ProfileStartDate = date_i18n("Y-m-d\TH:i:s");
-							$order->TrialBillingPeriod = $order->BillingPeriod;
-							$order->TrialBillingFrequency = $order->BillingFrequency;													
-							$order->TrialBillingCycles = 1;
-							$order->TrialAmount = 0;
-							
-							//add a billing cycle to make up for the trial, if applicable
-							if(!empty($order->TotalBillingCycles))
-								$order->TotalBillingCycles++;
-						}
-						elseif($order->InitialPayment == 0 && $order->TrialAmount == 0)
-						{
-							//it has a trial, but the amount is the same as the initial payment, so we can squeeze it in there
-							$order->ProfileStartDate = date_i18n("Y-m-d\TH:i:s");														
-							$order->TrialBillingCycles++;
-							
-							//add a billing cycle to make up for the trial, if applicable
-							if(!empty($order->TotalBillingCycles))
-								$order->TotalBillingCycles++;
-						}
-						else
-						{
-							//add a period to the start date to account for the initial payment
-							$order->ProfileStartDate = date_i18n("Y-m-d\TH:i:s", strtotime("+ " . $order->BillingFrequency . " " . $order->BillingPeriod, current_time("timestamp")));
-						}
-						
-						$order->ProfileStartDate = apply_filters("pmpro_profile_start_date", $order->ProfileStartDate, $order);
-						if($this->subscribe($order))
-						{
-							return true;
-						}
-						else
-						{
-							if($this->void($order))
-							{
-								if(!$order->error)
-									$order->error = __("Unknown error: Payment failed.", 'paid-memberships-pro' );
-							}
-							else
-							{
-								if(!$order->error)
-									$order->error = __("Unknown error: Payment failed.", 'paid-memberships-pro' );
-								
-								$order->error .= " " . __("A partial payment was made that we could not void. Please contact the site owner immediately to correct this.", 'paid-memberships-pro' );
-							}
-							
-							return false;								
-						}
-					}
-					else
-					{
-						//only a one time charge
-						$order->status = "success";	//saved on checkout page											
-						return true;
-					}
-				}
-				else
-				{
-					if(empty($order->error))
-						$order->error = __("Unknown error: Payment failed.", 'paid-memberships-pro' );
-					
-					return false;
-				}	
-			}	
-		}
-		
-		function authorize(&$order)
-		{
-			//create a code for the order
-			if(empty($order->code))
-				$order->code = $order->getRandomCode();
-			
-			//simulate a successful authorization
-			$order->payment_transaction_id = "TEST" . $order->code;
-			$order->updateStatus("authorized");													
-			return true;					
-		}
-		
-		function void(&$order)
-		{
-			//need a transaction id
-			if(empty($order->payment_transaction_id))
-				return false;
-				
-			//simulate a successful void
-			$order->payment_transaction_id = "TEST" . $order->code;
-			$order->updateStatus("voided");					
-			return true;
-		}	
-		
-		function charge(&$order)
-		{
-			//create a code for the order
-			if(empty($order->code))
-				$order->code = $order->getRandomCode();
-			
-			//simulate a successful charge
-			$order->payment_transaction_id = "TEST" . $order->code;
-			$order->updateStatus("success");					
-			return true;						
-		}
-		
-		function subscribe(&$order)
-		{
-			//create a code for the order
-			if(empty($order->code))
-				$order->code = $order->getRandomCode();
-			
-			//filter order before subscription. use with care.
-			$order = apply_filters("pmpro_subscribe_order", $order, $this);
-						
-			//simulate a successful subscription processing
-			$order->status = "success";		
-			$order->subscription_transaction_id = "TEST" . $order->code;				
-			return true;
-		}	
-		
-		function update(&$order)
-		{
-			//simulate a successful billing update
-			return true;
-		}
-		
-		function cancel(&$order)
-		{
-			//require a subscription id
-			if(empty($order->subscription_transaction_id))
-				return false;
-			
-			//simulate a successful cancel			
-			$order->updateStatus("cancelled");					
-			return true;
-		}	
-		
-		function getSubscriptionStatus(&$order)
-		{
-			//require a subscription id
-			if(empty($order->subscription_transaction_id))
-				return false;
-			
-			//this looks different for each gateway, but generally an array of some sort
-			return array();
+	abstract class PMProGateway
+	{
+		/**
+		 * Process charges and set up subscriptions.
+		 *
+		 * @param MemberOrder $order The order object to process.
+		 *
+		 * @return bool True if successful, false otherwise.
+		 */
+		abstract function process(&$order);
+
+		/**
+		 * Update the payment information for a subscription.
+		 *
+		 * @param MemberOrder $order An order object for the susbscription to update.
+		 * @return bool True if successful, false otherwise.
+		 */
+		function update( &$order ) {
+			// If this method is being called, then the gateway does not support updating.
+			$order->error  = __( 'Method update() does not exist.', 'paid-memberships-pro' );
+			return false;
 		}
 
-		function getTransactionStatus(&$order)
-		{			
-			//this looks different for each gateway, but generally an array of some sort
-			return array();
-		}		
+		/**
+		 * Cancels a subscription at the gateway.
+		 *
+		 * @param PMPro_Subscription $subscription to cancel.
+		 */
+		function cancel_subscription( $subscription ) {
+			// If this method is being called, then the gateway does not have this function defined. Call the legacy cancel() method.
+			$morder                              = new MemberOrder();
+			$morder->user_id                     = $subscription->get_user_id();
+			$morder->membership_id               = $subscription->get_membership_level_id();
+			$morder->gateway                     = $subscription->get_gateway();
+			$morder->gateway_environment         = $subscription->get_gateway_environment();
+			$morder->subscription_transaction_id = $subscription->get_subscription_transaction_id();
+			$this->cancel( $morder );
+		}
+
+		/**
+		 * Cancel a subscription for a passed order.
+		 * This is the legacy method for canceling subscriptions and will be deprecated in the future.
+		 *
+		 * @param MemberOrder $order The order object to cancel.
+		 * @return bool True if successful, false otherwise.
+		 */
+		function cancel(&$order) {
+			// If this method is being called, then the gateway does not support canceling subscriptions.
+			$order->error = __( 'Method cancel() does not exist.', 'paid-memberships-pro' );
+			return false;
+		}
 
 		/**
 		 * Check if the gateway supports a certain feature.
@@ -275,4 +110,98 @@
 			// Update the subscription.
 			$subscription->set( $update_array );
 		}
+
+		/**
+		 * @deprecated TBD Define this method in individual gateways when needed.
+		 */
+		function authorize(&$order)
+		{
+			_deprecated_function( __METHOD__, 'TBD' );
+
+			//create a code for the order
+			if(empty($order->code))
+				$order->code = $order->getRandomCode();
+			
+			//simulate a successful authorization
+			$order->payment_transaction_id = "TEST" . $order->code;
+			$order->updateStatus("authorized");													
+			return true;					
+		}
+
+		/**
+		 * @deprecated TBD Define this method in individual gateways when needed.
+		 */
+		function void(&$order)
+		{
+			_deprecated_function( __METHOD__, 'TBD' );
+			//need a transaction id
+			if(empty($order->payment_transaction_id))
+				return false;
+				
+			//simulate a successful void
+			$order->payment_transaction_id = "TEST" . $order->code;
+			$order->updateStatus("voided");					
+			return true;
+		}	
+
+		/**
+		 * @deprecated TBD Define this method in individual gateways when needed.
+		 */
+		function charge(&$order)
+		{
+			_deprecated_function( __METHOD__, 'TBD' );
+
+			//create a code for the order
+			if(empty($order->code))
+				$order->code = $order->getRandomCode();
+			
+			//simulate a successful charge
+			$order->payment_transaction_id = "TEST" . $order->code;
+			$order->updateStatus("success");					
+			return true;						
+		}
+
+		/**
+		 * @deprecated TBD Define this method in individual gateways when needed.
+		 */
+		function subscribe(&$order)
+		{
+			_deprecated_function( __METHOD__, 'TBD' );
+
+			//create a code for the order
+			if(empty($order->code))
+				$order->code = $order->getRandomCode();
+			
+			//filter order before subscription. use with care.
+			$order = apply_filters("pmpro_subscribe_order", $order, $this);
+						
+			//simulate a successful subscription processing
+			$order->status = "success";		
+			$order->subscription_transaction_id = "TEST" . $order->code;				
+			return true;
+		}	
+
+		/**
+		 * @deprecated TBD Use PMPro_Subscription instead.
+		 */
+		function getSubscriptionStatus(&$order)
+		{
+			_deprecated_function( __METHOD__, 'TBD' );
+			//require a subscription id
+			if(empty($order->subscription_transaction_id))
+				return false;
+			
+			//this looks different for each gateway, but generally an array of some sort
+			return array();
+		}
+
+		/**
+		 * @deprecated TBD
+		 */
+		function getTransactionStatus(&$order)
+		{			
+			_deprecated_function( __METHOD__, 'TBD' );
+			//this looks different for each gateway, but generally an array of some sort
+			return array();
+		}		
 	}

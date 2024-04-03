@@ -2040,8 +2040,10 @@ class PMProGateway_stripe extends PMProGateway {
 	 * Get subscription status from the Gateway.
 	 *
 	 * @since 2.3
+	 * @deprecated TBD Use PMPro_Subscription instead.
 	 */
 	public function getSubscriptionStatus( &$order ) {
+		_deprecated_function( __METHOD__, 'TBD' );
 		$subscription = $this->get_subscription( $order->subscription_transaction_id );
 
 		if ( ! empty( $subscription ) ) {
