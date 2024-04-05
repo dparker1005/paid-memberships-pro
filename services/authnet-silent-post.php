@@ -1,18 +1,14 @@
 <?php
-	global $isapage;
-	$isapage = true;
-
-	global $logstr;
-	$logstr = "";
-
 	//in case the file is loaded directly
-	if(!defined("ABSPATH"))
-	{
-		define('WP_USE_THEMES', false);
-		require_once(dirname(__FILE__) . '/../../../../wp-load.php');
+	if( ! defined( 'ABSPATH' ) ) {
+		exit;
 	}
+	
+	global $lostr, $wpdb;
+	$logstr = '';
 
-	global $wpdb;
+	// Sets the PMPRO_DOING_WEBHOOK constant and fires the pmpro_doing_webhook action.
+	pmpro_doing_webhook( 'authnet', true );
 
 	//some code taken from http://www.merchant-account-services.org/blog/handling-authorizenet-arb-subscription-failures/
 	// Flag if this is an ARB transaction. Set to false by default.
@@ -35,10 +31,29 @@
 	$fields = apply_filters("pmpro_authnet_silent_post_fields", $fields);
 	do_action("pmpro_before_authnet_silent_post", $fields);
 
-	//uncomment or add this to your wp-config to log requests by email
-	//define('PMPRO_AUTHNET_SILENT_POST_DEBUG', true);
-	if(defined('PMPRO_AUTHNET_SILENT_POST_DEBUG') && PMPRO_AUTHNET_SILENT_POST_DEBUG)
-		wp_mail(get_option("admin_email"), "Authorize.net Silent Post From " . get_option("blogname"), nl2br(var_export($fields, true)));
+	// Save input values to log
+	$logstr .= "\n----\n";
+	$logstr .= 'Logged on ' . date( 'Y-m-d H:i:s', current_time('timestamp' ) );
+	$logstr .= "\n----\n";
+	$logstr .= var_export($fields, true);
+	$logstr .= "\n----\n";
+	
+	// Saving a log file or sending an email
+	if(defined('PMPRO_AUTHNET_SILENT_POST_DEBUG') && PMPRO_AUTHNET_SILENT_POST_DEBUG === "log")
+	{
+		//file
+		$logfile = apply_filters( 'pmpro_authnet_silent_post_logfile', dirname( __FILE__ ) . "/../logs/authnet-silent-post.txt" );
+		$loghandle = fopen( $logfile, "a+" );
+		fwrite($loghandle, $logstr);
+		fclose($loghandle);
+	} elseif(defined('PMPRO_AUTHNET_SILENT_POST_DEBUG') && false !== PMPRO_AUTHNET_SILENT_POST_DEBUG) {
+		if(strpos(PMPRO_AUTHNET_SILENT_POST_DEBUG, "@"))
+			$log_email = PMPRO_AUTHNET_SILENT_POST_DEBUG;	//constant defines a specific email address
+		else
+			$log_email = get_option("admin_email");
+			
+		wp_mail( $log_email, "Authorize.net Silent Post From " . get_option( "blogname" ), nl2br( esc_html( $logstr ) ) );
+	}	
 
 	// If it is an ARB transaction, do something with it
 	if($arb == true)
@@ -67,6 +82,9 @@
 				$morder->payment_transaction_id = $fields['x_trans_id'];
 				$morder->subscription_transaction_id = $fields['x_subscription_id'];
 
+				//Assume no tax for now. Add ons will handle it later.
+				$morder->tax = 0;
+
 				$morder->gateway = $old_order->gateway;
 				$morder->gateway_environment = $old_order->gateway_environment;
 
@@ -80,6 +98,7 @@
 				$morder->Zip = $fields['x_zip'];
 				$morder->PhoneNumber = $fields['x_phone'];
 
+				$morder->billing = new stdClass();
 				$morder->billing->name = $fields['x_first_name'] . " " . $fields['x_last_name'];
 				$morder->billing->street = $fields['x_address'];
 				$morder->billing->city = $fields['x_city'];
@@ -88,14 +107,9 @@
 				$morder->billing->country = $fields['x_country'];
 				$morder->billing->phone = $fields['x_phone'];
 
-				//get CC info that is on file
-				$morder->cardtype = get_user_meta($user_id, "pmpro_CardType", true);
-				$morder->accountnumber = hideCardNumber(get_user_meta($user_id, "pmpro_AccountNumber", true), false);
-				$morder->expirationmonth = get_user_meta($user_id, "pmpro_ExpirationMonth", true);
-				$morder->expirationyear = get_user_meta($user_id, "pmpro_ExpirationYear", true);
-				$morder->ExpirationDate = $morder->expirationmonth . $morder->expirationyear;
-				$morder->ExpirationDate_YdashM = $morder->expirationyear . "-" . $morder->expirationmonth;
-
+				//Updates this order with the most recent orders payment method information and saves it. 
+				pmpro_update_order_with_recent_payment_method( $morder );
+				
 				//save
 				$morder->status = "success";
 				$morder->saveOrder();
@@ -120,6 +134,9 @@
 			//prep this order for the failure emails
 			$morder = new MemberOrder();
 			$morder->user_id = $user_id;
+			$morder->membership_id = $old_order->membership_id;
+			
+			$morder->billing = new stdClass();
 			$morder->billing->name = $fields['x_first_name'] . " " . $fields['x_last_name'];
 			$morder->billing->street = $fields['x_address'];
 			$morder->billing->city = $fields['x_city'];
@@ -128,11 +145,8 @@
 			$morder->billing->country = $fields['x_country'];
 			$morder->billing->phone = $fields['x_phone'];
 
-			//get CC info that is on file
-			$morder->cardtype = get_user_meta($user_id, "pmpro_CardType", true);
-			$morder->accountnumber = hideCardNumber(get_user_meta($user_id, "pmpro_AccountNumber", true), false);
-			$morder->expirationmonth = get_user_meta($user_id, "pmpro_ExpirationMonth", true);
-			$morder->expirationyear = get_user_meta($user_id, "pmpro_ExpirationYear", true);
+			//Updates this order with the most recent orders payment method information and saves it. 
+			pmpro_update_order_with_recent_payment_method( $morder );
 
 			// Email the user and ask them to update their credit card information
 			$pmproemail = new PMProEmail();

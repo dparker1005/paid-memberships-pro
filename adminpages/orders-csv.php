@@ -1,15 +1,13 @@
 <?php
 //only admins can get this
 if ( ! function_exists( "current_user_can" ) || ( ! current_user_can( "manage_options" ) && ! current_user_can( "pmpro_orderscsv" ) ) ) {
-	die( __( "You do not have permissions to perform this action.", 'paid-memberships-pro' ) );
+	die( esc_html__( "You do not have permissions to perform this action.", 'paid-memberships-pro' ) );
 }
-
-define('PMPRO_BENCHMARK', true);
 
 if (!defined('PMPRO_BENCHMARK'))
 	define('PMPRO_BENCHMARK', false);
 
-$start_memory = memory_get_usage(true);;
+$start_memory = memory_get_usage(true);
 $start_time = microtime(true);
 
 if (true === PMPRO_BENCHMARK)
@@ -42,6 +40,12 @@ if ( isset( $_REQUEST['l'] ) ) {
 	$l = intval( $_REQUEST['l'] );
 } else {
 	$l = false;
+}
+
+if ( isset( $_REQUEST['discount-code'] ) ) {
+	$discount_code = intval( $_REQUEST['discount-code'] );
+} else {
+	$discount_code = false;
 }
 
 if ( isset( $_REQUEST['start-month'] ) ) {
@@ -126,11 +130,11 @@ if ( $filter == "all" || ! $filter ) {
 	$start_date = $start_year . "-" . $start_month . "-" . $start_day;
 	$end_date   = $end_year . "-" . $end_month . "-" . $end_day;
 
-	//add times to dates
-	$start_date = $start_date . " 00:00:00";
-	$end_date   = $end_date . " 23:59:59";
+	//add times to dates and localize
+	$start_date = get_gmt_from_date( $start_date . ' 00:00:00' );
+	$end_date   = get_gmt_from_date( $end_date . ' 23:59:59' );
 
-	$condition = "timestamp BETWEEN '" . $start_date . "' AND '" . $end_date . "'";
+	$condition = "o.timestamp BETWEEN '" . $start_date . "' AND '" . $end_date . "'";
 } elseif ( $filter == "predefined-date-range" ) {
 	if ( $predefined_date == "Last Month" ) {
 		$start_date = date_i18n( "Y-m-d", strtotime( "first day of last month", current_time( "timestamp" ) ) );
@@ -148,15 +152,21 @@ if ( $filter == "all" || ! $filter ) {
 		$end_date   = date_i18n( "Y-m-d", strtotime( "last day of December $year", current_time( "timestamp" ) ) );
 	}
 
-	//add times to dates
-	$start_date = $start_date . " 00:00:00";
-	$end_date   = $end_date . " 23:59:59";
+	//add times to dates and localize
+	$start_date = get_gmt_from_date( $start_date . ' 00:00:00' );
+	$end_date   = get_gmt_from_date( $end_date . ' 23:59:59' );
 
-	$condition = "timestamp BETWEEN '" . esc_sql( $start_date ) . "' AND '" . esc_sql( $end_date ) . "'";
+	$condition = "o.timestamp BETWEEN '" . esc_sql( $start_date ) . "' AND '" . esc_sql( $end_date ) . "'";
 } elseif ( $filter == "within-a-level" ) {
-	$condition = "membership_id = " . esc_sql( $l );
+	$condition = "o.membership_id = " . (int) $l;
+} elseif ( $filter == 'with-discount-code' ) {
+	$condition = 'dc.code_id = ' . (int) $discount_code;
 } elseif ( $filter == "within-a-status" ) {
-	$condition = "status = '" . esc_sql( $status ) . "' ";
+	$condition = "o.status = '" . esc_sql( $status ) . "' ";
+} elseif ( $filter == 'only-paid' ) {
+	$condition = "o.total > 0";
+} elseif( $filter == 'only-free' ) {
+	$condition = "o.total = 0";
 }
 
 //string search
@@ -172,6 +182,10 @@ if ( ! empty( $s ) ) {
 
 	if ( ! empty( $join_with_usermeta ) ) {
 		$sqlQuery .= "LEFT JOIN $wpdb->usermeta um ON o.user_id = um.user_id ";
+	}
+
+	if ( $filter === 'with-discount-code' ) {
+		$sqlQuery .= "LEFT JOIN $wpdb->pmpro_discount_codes_uses dc ON o.id = dc.order_id ";
 	}
 
 	$sqlQuery .= "WHERE (1=2 ";
@@ -206,24 +220,26 @@ if ( ! empty( $s ) ) {
 	$fields = apply_filters( "pmpro_orders_search_fields", $fields );
 
 	foreach ( $fields as $field ) {
-		$sqlQuery .= " OR " . $field . " LIKE '%" . esc_sql( $s ) . "%' ";
+		$sqlQuery .= " OR " . esc_sql( $field ) . " LIKE '%" . esc_sql( $s ) . "%' ";
 	}
 
 	$sqlQuery .= ") ";
+	//Not escaping here because we escape the values in the condition statement
 	$sqlQuery .= "AND " . $condition . " ";
 	$sqlQuery .= "GROUP BY o.id ORDER BY o.id DESC, o.timestamp DESC ";
 
 } else {
-	$sqlQuery = "
-		SELECT SQL_CALC_FOUND_ROWS id
-		FROM {$wpdb->pmpro_membership_orders}
-		WHERE {$condition}
-		ORDER BY id DESC, timestamp DESC
-		";
+	$sqlQuery = "SELECT SQL_CALC_FOUND_ROWS o.id FROM $wpdb->pmpro_membership_orders o ";
+
+	if ( $filter === 'with-discount-code' ) {
+		$sqlQuery .= "LEFT JOIN $wpdb->pmpro_discount_codes_uses dc ON o.id = dc.order_id ";
+	}
+	//Not escaping here because we escape the values in the condition statement
+	$sqlQuery .= "WHERE " . $condition . ' ORDER BY o.id DESC, o.timestamp DESC ';
 }
 
 if ( ! empty( $start ) && ! empty( $limit ) ) {
-	$sqlQuery .= "LIMIT $start, $limit";
+	$sqlQuery .= "LIMIT " . (int) $start . "," . (int) $limit;
 }
 
 $headers   = array();
@@ -241,6 +257,7 @@ $headers[] = "Content-Disposition: attachment; filename={$filename};";
 
 $csv_file_header_array = array(
 	"id",
+	"code",
 	"user_id",
 	"user_login",
 	"first_name",
@@ -257,7 +274,6 @@ $csv_file_header_array = array(
 	"level_name",
 	"subtotal",
 	"tax",
-	"couponamount",
 	"total",
 	"payment_type",
 	"cardtype",
@@ -271,12 +287,15 @@ $csv_file_header_array = array(
 	"subscription_transaction_id",
 	"discount_code_id",
 	"discount_code",
+	"tos_consent_post_id",
+	"tos_consent_post_modified",
 	"timestamp"
 );
 
 //these are the meta_keys for the fields (arrays are object, property. so e.g. $theuser->ID)
 $default_columns = array(
 	array( "order", "id" ),
+	array( "order", "code" ),
 	array( "user", "ID" ),
 	array( "user", "user_login" ),
 	array( "user", "first_name" ),
@@ -293,7 +312,6 @@ $default_columns = array(
 	array( "level", "name" ),
 	array( "order", "subtotal" ),
 	array( "order", "tax" ),
-	array( "order", "couponamount" ),
 	array( "order", "total" ),
 	array( "order", "payment_type" ),
 	array( "order", "cardtype" ),
@@ -407,11 +425,11 @@ for ( $ic = 1; $ic <= $iterations; $ic ++ ) {
 	}
 
 	//increment starting position
-	if ( $iterations > 1 ) {
+	if ( $ic > 1 ) {
 		$i_start += $max_orders_per_loop;
 	}
 	// get the order list we should process
-	$order_list = array_slice( $order_ids, $i_start, ( $i_start + ( $max_orders_per_loop - 1 ) ) );
+	$order_list = array_slice( $order_ids, $i_start, $max_orders_per_loop );
 
 	if (PMPRO_BENCHMARK)
 	{
@@ -420,7 +438,6 @@ for ( $ic = 1; $ic <= $iterations; $ic ++ ) {
 	}
 
 	foreach ( $order_list as $order_id ) {
-
 		$csvoutput = array();
 
 		$order            = new MemberOrder();
@@ -467,8 +484,18 @@ for ( $ic = 1; $ic <= $iterations; $ic ++ ) {
 			}
 		}
 
+		//tos_consent
+		$consent_entry = $order->get_tos_consent_log_entry();
+		if( !empty( $consent_entry ) ) {
+			array_push( $csvoutput, pmpro_enclose( $consent_entry['post_id'] ) );
+			array_push( $csvoutput, pmpro_enclose( $consent_entry['post_modified'] ) );
+		} else {
+			array_push( $csvoutput, '' );
+			array_push( $csvoutput, '' );
+		}				
+
 		//timestamp
-		$ts = date_i18n( $dateformat, $order->timestamp );
+		$ts = date_i18n( $dateformat, $order->getTimestamp() );
 		array_push( $csvoutput, pmpro_enclose( $ts ) );
 
 		//any extra columns
@@ -506,11 +533,9 @@ for ( $ic = 1; $ic <= $iterations; $ic ++ ) {
 		error_log("PMPRO_BENCHMARK - Time processing data: {$sec}.{$usec} seconds");
 		error_log("PMPRO_BENCHMARK - Peak memory usage: " . number_format($memory_processing_data, false, '.', ',') . " bytes");
 	}
-
 	$order_list = null;
 	wp_cache_flush();
 }
-
 pmpro_transmit_order_content( $csv_fh, $filename, $headers );
 
 function pmpro_enclose( $s ) {
@@ -534,12 +559,12 @@ function pmpro_transmit_order_content( $csv_fh, $filename, $headers = array() ) 
 
 	//did we accidentally send errors/warnings to browser?
 	if ( headers_sent() ) {
-		echo str_repeat( '-', 75 ) . "<br/>\n";
+		echo esc_html( str_repeat( '-', 75 ) ) . "<br/>\n";
 		echo 'Please open a support case and paste in the warnings/errors you see above this text to\n ';
-		echo 'the <a href="http://paidmembershipspro.com/support/?utm_source=plugin&utm_medium=banner&utm_campaign=orders_csv" target="_blank">Paid Memberships Pro support forum</a><br/>\n';
-		echo str_repeat( "=", 75 ) . "<br/>\n";
-		echo file_get_contents( $filename );
-		echo str_repeat( "=", 75 ) . "<br/>\n";
+		echo 'the <a href="http://paidmembershipspro.com/support/?utm_source=plugin&utm_medium=pmpro-orders-csv&utm_campaign=support" target="_blank">Paid Memberships Pro support forum</a><br/>\n';
+		echo esc_html( str_repeat( '-', 75 ) ) . "<br/>\n";
+		echo wp_kses_post( file_get_contents( $filename ) );
+		echo esc_html( str_repeat( '-', 75 ) ) . "<br/>\n";
 	}
 
 	//transmission
@@ -557,10 +582,15 @@ function pmpro_transmit_order_content( $csv_fh, $filename, $headers = array() ) 
 			ini_set( 'zlib.output_compression', 'Off' );
 		}
 
-		// open and send the file contents to the remote location
-		$fh = fopen( $filename, 'rb' );
-		fpassthru( $fh );
-		fclose( $fh );
+		if( function_exists( 'fpassthru' ) ) {
+			// use fpassthru to output the csv
+			$csv_fh = fopen( $filename, 'rb' );
+			fpassthru( $csv_fh );
+			fclose( $csv_fh );
+		} else {
+			// use readfile() if fpassthru() is disabled (like on Flywheel Hosted)
+			readfile( $filename );
+		}
 
 		// remove the temp file
 		unlink( $filename );

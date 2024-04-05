@@ -2,7 +2,7 @@
 
 	if(!function_exists("current_user_can") || (!current_user_can("manage_options") && !current_user_can("pmpro_memberslistcsv")))
 	{
-		die(__("You do not have permissions to perform this action.", 'paid-memberships-pro' ));
+		die(esc_html__("You do not have permissions to perform this action.", 'paid-memberships-pro' ));
 	}
 
 	if (!defined('PMPRO_BENCHMARK'))
@@ -35,10 +35,22 @@
 	global $wpdb;
 
 	//get users (search input field)
-	if(isset($_REQUEST['s']))
-		$s = sanitize_text_field($_REQUEST['s']);
-	else
-		$s = "";
+	$search_key = false;
+	if( isset( $_REQUEST['s'] ) ) {
+		$s = trim( sanitize_text_field( $_REQUEST['s'] ) );
+	} else {
+		$s = '';
+	}
+
+	// If there's a colon in the search, let's split it out.
+	if( ! empty( $s ) && strpos( $s, ':' ) !== false ) {
+		$parts = explode( ':', $s );
+		$search_key = array_shift( $parts );
+		$s = implode( ':', $parts );
+	}
+
+	// Treat * as wild cards.
+	$s = str_replace( '*', '%', $s );
 
 	// requested a level id
 	if(isset($_REQUEST['l']))
@@ -86,7 +98,7 @@
 		$headers[] = 'Content-Disposition: attachment; filename="members_list.csv"';
 
 	//set default CSV file headers, using comma as delimiter
-	$csv_file_header = "id,username,firstname,lastname,email,billing firstname,billing lastname,address1,address2,city,state,zipcode,country,phone,membership,initial payment,fee,term,discount_code_id,discount_code,joined";
+	$csv_file_header = "id,username,firstname,lastname,email,membership,discount_code_id,discount_code,subscription_transaction_id,billing_amount,cycle_number,cycle_period,next_payment_date,joined";
 
 	if($l == "oldmembers")
 		$csv_file_header .= ",ended";
@@ -100,22 +112,10 @@
 		array("metavalues", "first_name"),
 		array("metavalues", "last_name"),
 		array("theuser", "user_email"),
-		array("metavalues", "pmpro_bfirstname"),
-		array("metavalues", "pmpro_blastname"),
-		array("metavalues", "pmpro_baddress1"),
-		array("metavalues", "pmpro_baddress2"),
-		array("metavalues", "pmpro_bcity"),
-		array("metavalues", "pmpro_bstate"),
-		array("metavalues", "pmpro_bzipcode"),
-		array("metavalues", "pmpro_bcountry"),
-		array("metavalues", "pmpro_bphone"),
 		array("theuser", "membership"),
-		array("theuser", "initial_payment"),
-		array("theuser", "billing_amount"),
-		array("theuser", "cycle_period"),
 		array("discount_code", "id"),
 		array("discount_code", "code")
-		//joindate and enddate are handled specifically below
+		// Subscription information, joindate, and enddate are handled specifically below
 	);
 
 	//filter
@@ -143,8 +143,36 @@
 			DISTINCT u.ID
 		FROM $wpdb->users u ";
 
-	if ($s)
-		$sqlQuery .= "LEFT JOIN {$wpdb->usermeta} um ON u.ID = um.user_id ";
+	if ( $s ) {
+		if ( ! empty( $search_key ) ) {
+			// If there's a colon in the search string, make the search smarter.
+			if( in_array( $search_key, array( 'login', 'nicename', 'email', 'url', 'display_name' ), true ) ) {
+				$key_column = 'u.user_' . $search_key; // All options for $search_key are safe for use in a query.
+				$search = " AND $key_column LIKE '%" . esc_sql( $s ) . "%' ";
+			} elseif ( $search_key === 'discount' || $search_key === 'discount_code' || $search_key === 'dc' ) {
+				$user_ids = $wpdb->get_col( "SELECT dcu.user_id FROM $wpdb->pmpro_discount_codes_uses dcu LEFT JOIN $wpdb->pmpro_discount_codes dc ON dcu.code_id = dc.id WHERE dc.code = '" . esc_sql( $s ) . "'" );
+				if ( empty( $user_ids ) ) {
+					$user_ids = array(0);	// Avoid warning, but ensure 0 results.
+				}
+				$search = " AND u.ID IN(" . implode( ",", $user_ids ) . ") ";
+			} else {
+				$user_ids = $wpdb->get_col( "SELECT user_id FROM $wpdb->usermeta WHERE meta_key = '" . esc_sql( $search_key ) . "' AND meta_value lIKE '%" . esc_sql( $s ) . "%'" );
+				if ( empty( $user_ids ) ) {
+					$user_ids = array(0);	// Avoid warning, but ensure 0 results.
+				}
+				$search = " AND u.ID IN(" . implode( ",", $user_ids ) . ") ";
+			}
+		} elseif( function_exists( 'wp_is_large_user_count' ) && wp_is_large_user_count() ) {
+			// Don't check user meta at all on big sites.
+			$search_query = " AND ( u.user_login LIKE '%" . esc_sql($s) . "%' OR u.user_email LIKE '%" . esc_sql($s) . "%' OR u.display_name LIKE '%" . esc_sql($s) . "%' ) ";
+		} else {
+			// Default search checks a few fields.
+			$sqlQuery .= "LEFT JOIN {$wpdb->usermeta} um ON u.ID = um.user_id ";
+			$search = " AND ( u.user_login LIKE '%" . esc_sql($s) . "%' OR u.user_email LIKE '%" . esc_sql($s) . "%' OR um.meta_value LIKE '%" . esc_sql($s) . "%' OR u.display_name LIKE '%" . esc_sql($s) . "%' ) ";
+		}
+	} else {
+		$search = '';
+	}
 
 	$sqlQuery .= "LEFT JOIN {$wpdb->pmpro_memberships_users} mu ON u.ID = mu.user_id ";
 	$sqlQuery .= "LEFT JOIN {$wpdb->pmpro_membership_levels} m ON mu.membership_id = m.id ";
@@ -161,11 +189,7 @@
 	$sqlQuery .= "WHERE mu.membership_id > 0 ";
 
 	// looking for a specific user
-	$search = "";
-	
-	if($s)
-	{
-		$search = "AND (u.display_name LIKE '%" . esc_sql($s) . "%' OR u.user_login LIKE '%". esc_sql($s) ."%' OR u.user_email LIKE '%". esc_sql($s) ."%' OR um.meta_value LIKE '%". esc_sql($s) ."%') ";
+	if ( ! empty( $s ) ) {
 		$sqlQuery .= $search;
 	}
 
@@ -187,7 +211,7 @@
 
 	//records for active users with the requested membership level
 	// elseif($l)
-	$filter = ( (is_null($filter) && is_numeric($l)) ? " AND mu.status = 'active' AND mu.membership_id = " . esc_sql($l) . " " : $filter);
+	$filter = ( (is_null($filter) && is_numeric($l)) ? " AND mu.status = 'active' AND mu.membership_id = " . (int) $l . " " : $filter);
 
 	//any active users
 	// else
@@ -296,11 +320,8 @@
 			$last_uid = $theusers[($users_found - 1)];
 
 		//increment starting position
-		if(0 < $iterations)
-		{
-			$i_start += $max_users_per_loop;
-		}
-		
+		$i_start += $max_users_per_loop;
+
 		//escape the % for LIKE comparison with $wpdb
 		if(!empty($search))
 			$search = str_replace('%', '%%', $search);
@@ -310,7 +331,7 @@
 				DISTINCT u.ID,
 				u.user_login,
 				u.user_email,
-				UNIX_TIMESTAMP(u.user_registered) as joindate,
+				UNIX_TIMESTAMP(CONVERT_TZ(u.user_registered, '+00:00', @@global.time_zone)) as joindate,
 				u.user_login,
 				u.user_nicename,
 				u.user_url,
@@ -318,10 +339,7 @@
 				u.user_status,
 				u.display_name,
 				mu.membership_id,
-				mu.initial_payment,
-				mu.billing_amount,
-				mu.cycle_period,
-				UNIX_TIMESTAMP(mu.enddate) as enddate,
+				UNIX_TIMESTAMP(CONVERT_TZ(max(mu.enddate), '+00:00', @@global.time_zone)) as enddate,
 				m.name as membership
 			FROM {$wpdb->users} u
 			LEFT JOIN {$wpdb->usermeta} um ON u.ID = um.user_id
@@ -329,7 +347,7 @@
 			LEFT JOIN {$wpdb->pmpro_membership_levels} m ON mu.membership_id = m.id
 			{$former_member_join}
 			WHERE u.ID BETWEEN %d AND %d AND mu.membership_id > 0 {$filter} {$search}
-			-- GROUP BY u.ID
+			GROUP BY u.ID, mu.membership_id
 			ORDER BY u.ID",
 				$first_uid,
 				$last_uid
@@ -404,22 +422,29 @@
 				}
 			}
 
-			//joindate and enddate
-			array_push($csvoutput, pmpro_enclose(date($dateformat, $theuser->joindate)));
+			// Subscription transaction ID, billing amount, cycle number, and cycle period.
+			$subscriptions = PMPro_Subscription::get_subscriptions_for_user( $theuser->ID, $theuser->membership_id );
+			array_push($csvoutput, pmpro_enclose( ( empty( $subscriptions  ) ? '' : $subscriptions[0]->get_subscription_transaction_id() ) ) );
+			array_push($csvoutput, pmpro_enclose( ( empty( $subscriptions  ) ? '' : $subscriptions[0]->get_billing_amount() ) ) );
+			array_push($csvoutput, pmpro_enclose( ( empty( $subscriptions  ) ? '' : $subscriptions[0]->get_cycle_number() ) ) );
+			array_push($csvoutput, pmpro_enclose( ( empty( $subscriptions  ) ? '' : $subscriptions[0]->get_cycle_period() ) ) );
+			array_push($csvoutput, pmpro_enclose( ( empty( $subscriptions  ) ? '' : date_i18n($dateformat, $subscriptions[0]->get_next_payment_date() ) ) ) );
 
-			if($theuser->membership_id)
-			{
-				if($theuser->enddate)
-					array_push($csvoutput, pmpro_enclose(apply_filters("pmpro_memberslist_expires_column", date_i18n($dateformat, $theuser->enddate), $theuser)));
-				else
-					array_push($csvoutput, pmpro_enclose(apply_filters("pmpro_memberslist_expires_column", "Never", $theuser)));
+			//joindate and enddate
+			array_push($csvoutput, pmpro_enclose(date_i18n($dateformat, $theuser->joindate)));
+
+			if ( $theuser->membership_id ) {
+				// We are no longer filtering the expiration date text for performance reasons.
+				if ( $theuser->enddate ) {
+					array_push( $csvoutput, pmpro_enclose( date_i18n( $dateformat, $theuser->enddate ) ) );
+				} else {
+					array_push( $csvoutput, pmpro_enclose( __( 'N/A', 'paid-memberships-pro' ) ) );
+				}
+			} elseif($l == "oldmembers" && $theuser->enddate) {
+				array_push($csvoutput, pmpro_enclose(date_i18n($dateformat, $theuser->enddate)));
+			} else {
+				array_push($csvoutput, __('N/A', 'paid-memberships-pro'));
 			}
-			elseif($l == "oldmembers" && $theuser->enddate)
-			{
-				array_push($csvoutput, pmpro_enclose(date($dateformat, $theuser->enddate)));
-			}
-			else
-				array_push($csvoutput, "N/A");
 
 			//any extra columns
 			if(!empty($extra_columns))
@@ -528,12 +553,12 @@
 		//did we accidentally send errors/warnings to browser?
 		if (headers_sent())
 		{
-			echo str_repeat('-', 75) . "<br/>\n";
+			echo esc_html( str_repeat('-', 75) ) . "<br/>\n";
 			echo 'Please open a support case and paste in the warnings/errors you see above this text to\n ';
 			echo 'the <a href="http://paidmembershipspro.com/support/?utm_source=plugin&utm_medium=banner&utm_campaign=memberslist_csv" target="_blank">Paid Memberships Pro support forum</a><br/>\n';
-			echo str_repeat("=", 75) . "<br/>\n";
-			echo file_get_contents($filename);
-			echo str_repeat("=", 75) . "<br/>\n";
+			echo esc_html( str_repeat('-', 75) ) . "<br/>\n";
+			echo wp_kses_post( file_get_contents($filename) );
+			echo esc_html( str_repeat('-', 75) ) . "<br/>\n";
 		}
 
 		//transmission
@@ -553,13 +578,18 @@
 				ini_set('zlib.output_compression', 'Off');
 			}
 
-			// open and send the file contents to the remote location
-			$fh = fopen( $filename, 'rb' );
-			fpassthru($fh);
-			fclose($fh);
+			if( function_exists( 'fpassthru' ) ) {
+				// use fpassthru to output the csv
+				$csv_fh = fopen( $filename, 'rb' );
+				fpassthru( $csv_fh );
+				fclose( $csv_fh );
+			} else {
+				// use readfile() if fpassthru() is disabled (like on Flywheel Hosted)
+				readfile( $filename );
+			}
 
 			// remove the temp file
-			unlink($filename);
+			unlink( $filename );
 		}
 
 		//allow user to clean up after themselves

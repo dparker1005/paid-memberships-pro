@@ -1,7 +1,3 @@
-.pmpro_admin {
-	background: url(../images/Paid-Memberships-Pro_watermark.png) bottom left no-repeat !important;
-}
-
 .pmpro_admin .pmpro_banner h2 {
 	float: right;
 }
@@ -24,17 +20,12 @@
 	border-right: none;
 }
 
-/* messages */
-.pmpro_message {
-	padding: 6px 25px 6px 6px;
-}
-
 /* highlighted trs */
 
 /* discount levels */
 
 /* pagination */
-div.pmpro_pagination {
+.pmpro_pagination {
 	float: left;
 }
 
