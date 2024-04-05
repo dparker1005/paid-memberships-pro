@@ -1,23 +1,67 @@
 <?php
-
 global $current_user, $pmpro_invoice;
 
-if($current_user->ID)
-    $current_user->membership_level = pmpro_getMembershipLevelForUser($current_user->ID);
+// Redirect non-user to the login page; pass the Confirmation page as the redirect_to query arg.
+if ( ! is_user_logged_in() ) {
+	// Get level ID from URL parameter.
+	if ( ! empty( $_REQUEST['pmpro_level'] ) ) {
+		$confirmation_url = add_query_arg( 'pmpro_level', sanitize_text_field( $_REQUEST['pmpro_level'] ), pmpro_url( 'confirmation' ) );
+	} else {
+		$confirmation_url = pmpro_url( 'confirmation' );
+	}
+	wp_redirect( add_query_arg( 'redirect_to', urlencode( $confirmation_url ), pmpro_login_url() ) );
+	exit;
+}
 
-/*
-	Use the filter to add your gateway here if you want to show them a message on the confirmation page while their checkout is pending.
-	For example, when PayPal Standard is used, we need to wait for PayPal to send a message through IPN that the payment was accepted.
-	In the meantime, the order is in pending status and the confirmation page shows a message RE waiting.
-*/
-$gateways_with_pending_status = apply_filters('pmpro_gateways_with_pending_status', array('paypalstandard', 'twocheckout', 'gourl'));
-	
-//must be logged in
-if (empty($current_user->ID) || (empty($current_user->membership_level->ID) && !in_array(pmpro_getGateway(), $gateways_with_pending_status)))
-    wp_redirect(home_url());
+// If there was a level passed, grab it.
+$confirmation_level = ! empty( $_REQUEST['pmpro_level'] ) ? intval( $_REQUEST['pmpro_level'] ) : null;
+$confirmation_level = empty( $confirmation_level ) && ! empty( $_REQUEST['level'] ) ? intval( $_REQUEST['level'] ) : $confirmation_level; // Backwards compatibility.
 
-//if membership is a paying one, get invoice from DB
-if (!empty($current_user->membership_level) && !pmpro_isLevelFree($current_user->membership_level)) {
-    $pmpro_invoice = new MemberOrder();
-    $pmpro_invoice->getLastMemberOrder($current_user->ID, apply_filters("pmpro_confirmation_order_status", array("success", "pending")));
+// Get the corresponding invoice.
+$pmpro_invoice = new MemberOrder();
+if ( ! empty( $confirmation_level ) ) {
+	$pmpro_invoice->getLastMemberOrder( $current_user->ID, apply_filters( 'pmpro_confirmation_order_status', array( 'success', 'pending', 'token' ) ), $confirmation_level );
+} else {
+	// If there wasn't a confirmation level passed, get the last invoice for the current user and use that level.
+	$pmpro_invoice->getLastMemberOrder( $current_user->ID, apply_filters( 'pmpro_confirmation_order_status', array( 'success', 'pending', 'token' ) ) );
+	$confirmation_level = $pmpro_invoice->membership_id;
+}
+
+// If no invoice was found or we still don't have a level, redirect to the account page.
+if ( empty( $pmpro_invoice ) || empty( $confirmation_level ) ) {
+	$redirect_url = pmpro_url( 'account' );
+	wp_redirect( $redirect_url );
+	exit;
+}
+
+// Get the full level object.
+$user_level = pmpro_getSpecificMembershipLevelForUser( $current_user->ID, $confirmation_level );
+$current_user->membership_level = $user_level; // Backwards compatibility.
+
+// If the user doesn't have the level they are confirming (including pending checkouts), redirect them to the account page.
+if ( ! in_array( $pmpro_invoice->status, array( 'pending', 'token' ) ) && empty( $user_level ) ) {
+	$redirect_url = pmpro_url( 'account' );
+	wp_redirect( $redirect_url );
+	exit;
+}
+
+// If the payment hasn't completed, enqueue JS to check for completion.
+if ( in_array( $pmpro_invoice->status, array( 'pending', 'token' ) ) ) {
+	// Enqueue PMPro Confirmation script.
+	wp_register_script(
+		'pmpro_confirmation',
+		plugins_url( 'js/pmpro-confirmation.js', PMPRO_BASE_FILE ),
+		array( 'jquery' ),
+		PMPRO_VERSION
+	);
+	wp_localize_script(
+		'pmpro_confirmation',
+		'pmpro',
+		array(
+			'restUrl' => get_rest_url(),
+			'nonce'   => wp_create_nonce( 'wp_rest' ),
+			'code'    => $pmpro_invoice->code,
+		)
+	);
+	wp_enqueue_script( 'pmpro_confirmation' );
 }

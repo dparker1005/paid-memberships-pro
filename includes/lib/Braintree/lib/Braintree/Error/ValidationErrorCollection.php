@@ -8,11 +8,10 @@ use Braintree\Collection;
  *
  * <b>== More information ==</b>
  *
- * For more detailed information on Validation errors, see {@link http://www.braintreepayments.com/gateway/validation-errors http://www.braintreepaymentsolutions.com/gateway/validation-errors}
+ * For more detailed information on Validation errors, see {@link https://developers.braintreepayments.com/reference/general/validation-errors/overview/php https://developers.braintreepayments.com/reference/general/validation-errors/overview/php}
  *
  * @package    Braintree
  * @subpackage Error
- * @copyright  2015 Braintree, a division of PayPal, Inc.
  *
  * @property-read array $errors
  * @property-read array $nested
@@ -121,8 +120,11 @@ class ValidationErrorCollection extends Collection
     private function _inspect($errors, $scope = null)
     {
         $eOutput = '[' . __CLASS__ . '/errors:[';
-        foreach($errors AS $error => $errorObj) {
-            $outputErrs[] = "({$errorObj->error['code']} {$errorObj->error['message']})";
+        $outputErrs = [];
+         foreach($errors AS $error => $errorObj) {
+            if (is_array($errorObj->error)) {
+                $outputErrs[] = "({$errorObj->error['code']} {$errorObj->error['message']})";
+            }
         }
         $eOutput .= join(', ', $outputErrs) . ']]';
 

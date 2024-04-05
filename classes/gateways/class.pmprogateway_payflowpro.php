@@ -42,6 +42,26 @@
 		}
 
 		/**
+		 * Check whether or not a gateway supports a specific feature.
+		 * 
+		 * @since 3.0
+		 * 
+		 * @return string|boolean $supports Returns whether or not the gateway supports the requested feature.
+		 */
+		public static function supports( $feature ) {
+			$supports = array(
+				'subscription_sync' => false,
+				'payment_method_updates' => 'individual'
+			);
+
+			if ( empty( $supports[$feature] ) ) {
+				return false;
+			}
+
+			return $supports[$feature];
+		}
+
+		/**
 		 * Get a list of payment options that the this gateway needs/supports.
 		 *
 		 * @since 1.8
@@ -60,7 +80,7 @@
 				'use_ssl',
 				'tax_state',
 				'tax_rate',
-				'accepted_credit_cards'
+				'accepted_credit_cards',
 			);
 
 			return $options;
@@ -92,49 +112,58 @@
 		?>
 		<tr class="pmpro_settings_divider gateway gateway_payflowpro" <?php if($gateway != "payflowpro") { ?>style="display: none;"<?php } ?>>
 			<td colspan="2">
-				<?php _e('Payflow Pro Settings', 'paid-memberships-pro' ); ?>
+				<hr />
+				<h2 class="title"><?php esc_html_e( 'Payflow Pro Settings', 'paid-memberships-pro' ); ?></h2>
 			</td>
 		</tr>
 		<tr class="gateway gateway_payflowpro" <?php if($gateway != "payflowpro") { ?>style="display: none;"<?php } ?>>
 		    <th scope="row" valign="top">
-				<label for="payflow_partner"><?php _e('Partner', 'paid-memberships-pro' );?>:</label>
+				<label for="payflow_partner"><?php esc_html_e('Partner', 'paid-memberships-pro' );?></label>
 			</th>
 			<td>
-				<input type="text" id="payflow_partner" name="payflow_partner" size="60" value="<?php echo esc_attr($values['payflow_partner'])?>" />
+				<input type="text" id="payflow_partner" name="payflow_partner" value="<?php echo esc_attr($values['payflow_partner'])?>" class="regular-text code" />
 			</td>
 	    </tr>
 	    <tr class="gateway gateway_payflowpro" <?php if($gateway != "payflowpro") { ?>style="display: none;"<?php } ?>>
 		    <th scope="row" valign="top">
-				<label for="payflow_vendor"><?php _e('Vendor', 'paid-memberships-pro' );?>:</label>
+				<label for="payflow_vendor"><?php esc_html_e('Vendor', 'paid-memberships-pro' );?></label>
 			</th>
 			<td>
-				<input type="text" id="payflow_vendor" name="payflow_vendor" size="60" value="<?php echo esc_attr($values['payflow_vendor'])?>" />
+				<input type="text" id="payflow_vendor" name="payflow_vendor" value="<?php echo esc_attr($values['payflow_vendor'])?>" class="regular-text code" />
 			</td>
 	    </tr>
 	    <tr class="gateway gateway_payflowpro" <?php if($gateway != "payflowpro") { ?>style="display: none;"<?php } ?>>
 		    <th scope="row" valign="top">
-				<label for="payflow_user"><?php _e('User', 'paid-memberships-pro' );?>:</label>
+				<label for="payflow_user"><?php esc_html_e('User', 'paid-memberships-pro' );?></label>
 			</th>
 			<td>
-				<input type="text" id="payflow_user" name="payflow_user" size="60" value="<?php echo esc_attr($values['payflow_user'])?>" />
+				<input type="text" id="payflow_user" name="payflow_user" value="<?php echo esc_attr($values['payflow_user'])?>" class="regular-text code" />
 			</td>
 	    </tr>
 	    <tr class="gateway gateway_payflowpro" <?php if($gateway != "payflowpro") { ?>style="display: none;"<?php } ?>>
 		    <th scope="row" valign="top">
-				<label for="payflow_pwd"><?php _e('Password', 'paid-memberships-pro' );?>:</label>
+				<label for="payflow_pwd"><?php esc_html_e('Password', 'paid-memberships-pro' );?></label>
 			</th>
 			<td>
-				<input type="password" id="payflow_pwd" name="payflow_pwd" size="60" value="<?php echo esc_attr($values['payflow_pwd'])?>" />
+				<input type="password" id="payflow_pwd" name="payflow_pwd" value="<?php echo esc_attr($values['payflow_pwd'])?>" class="regular-text code" />
 			</td>
 	    </tr>
 		<tr class="gateway gateway_payflowpro" <?php if($gateway != "payflowpro") { ?>style="display: none;"<?php } ?>>
 			<th scope="row" valign="top">
-				<label><?php _e('IPN Handler', 'paid-memberships-pro' );?>:</label>
+				<label><?php esc_html_e('IPN Handler', 'paid-memberships-pro' );?></label>
 			</th>
 			<td>
-				<p><?php
-					$addon_url = "http://www.paidmembershipspro.com/add-ons/plugins-on-github/payflow-recurring-orders-addon/";
-					printf(__('Payflow does not use IPN. To sync recurring subscriptions, please see <a target="_blank" href="%s">this addon</a>.', 'paid-memberships-pro' ), $addon_url);?>
+				<p class="description">
+				<?php
+					$allowed_message_html = array (
+						'a' => array (
+							'href' => array(),
+							'target' => array(),
+							'title' => array(),
+						),
+					);
+					echo sprintf( wp_kses( __( 'Payflow does not use IPN. To sync recurring subscriptions, please see the <a target="_blank" href="%s" title="the Payflow Recurring Orders Add On">Payflow Recurring Orders Add On</a>.', 'paid-memberships-pro' ), $allowed_message_html ), 'https://www.paidmembershipspro.com/add-ons/payflow-recurring-orders-addon/?utm_source=plugin&utm_medium=pmpro-paymentsettings&utm_campaign=add-ons&utm_content=payflow-recurring-orders-addon' );
+				?>
 				</p>
 			</td>
 		</tr>
@@ -154,8 +183,7 @@
 				if($authorization_id)
 				{
 					$this->void($order, $authorization_id);
-					$order->ProfileStartDate = date_i18n("Y-m-d", strtotime("+ " . $order->BillingFrequency . " " . $order->BillingPeriod, current_time("timestamp"))) . "T0:0:0";
-					$order->ProfileStartDate = apply_filters("pmpro_profile_start_date", $order->ProfileStartDate, $order);
+					$order->ProfileStartDate = pmpro_calculate_profile_start_date( $order, 'Y-m-d\TH:i:s' );
 					return $this->subscribe($order);
 				}
 				else
@@ -173,8 +201,7 @@
 					//set up recurring billing
 					if(pmpro_isLevelRecurring($order->membership_level))
 					{
-						$order->ProfileStartDate = date_i18n("Y-m-d", strtotime("+ " . $order->BillingFrequency . " " . $order->BillingPeriod, current_time("timestamp"))) . "T0:0:0";
-						$order->ProfileStartDate = apply_filters("pmpro_profile_start_date", $order->ProfileStartDate, $order);
+						$order->ProfileStartDate = pmpro_calculate_profile_start_date( $order, 'Y-m-d\TH:i:s' );
 						if($this->subscribe($order))
 						{
 							return true;
@@ -218,10 +245,10 @@
 
 			$nvpStr .="&AMT=1.00";
 			/* PayFlow Pro doesn't use IPN so this is a little confusing */
-			// $nvpStr .= "&NOTIFYURL=" . urlencode(admin_url('admin-ajax.php') . "?action=ipnhandler");
+			// $nvpStr .= "&NOTIFYURL=" . urlencode( add_query_arg( 'action', 'ipnhandler', admin_url('admin-ajax.php') ) );
 			//$nvpStr .= "&L_BILLINGTYPE0=RecurringPayments&L_BILLINGAGREEMENTDESCRIPTION0=" . $order->PaymentAmount;
 
-			$nvpStr .= "&CUSTIP=" . $_SERVER['REMOTE_ADDR'] . "&INVNUM=" . $order->code;
+			$nvpStr .= "&CUSTIP=" . pmpro_get_ip() . "&INVNUM=" . $order->code;
 
 			//credit card fields
 			if($order->cardtype == "American Express")
@@ -307,16 +334,31 @@
 			$amount = $order->InitialPayment;
 			$amount_tax = $order->getTaxForPrice($amount);
 			$order->subtotal = $amount;
-			$amount = round((float)$amount + (float)$amount_tax, 2);
+			$amount = pmpro_round_price_as_string((float)$amount + (float)$amount_tax);
 
 			//paypal profile stuff
 			$nvpStr = "";
+
+			// Only add CARDONFILE for initial charge if it's recurring.
+			if ( pmpro_isLevelRecurring( $order->membership_level ) ) {
+				/*
+				 * Card on File is now required.
+				 *
+				 * CITR: The customer just performed an action to make the transaction.
+				 * MITR: The customer passively approved during CITR to make this subsequent (recurring) transaction.
+				 *
+				 * @link https://developer.paypal.com/docs/payflow/integration-guide/card-on-file/
+				 */
+				$nvpStr .= "&CARDONFILE=CITR";
+			}
+
 			$nvpStr .="&AMT=" . $amount . "&TAXAMT=" . $amount_tax . "&CURRENCY=" . $pmpro_currency;
+
 			/* PayFlow Pro doesn't use IPN so this is a little confusing */
-			// $nvpStr .= "&NOTIFYURL=" . urlencode(admin_url('admin-ajax.php') . "?action=ipnhandler");
+			// $nvpStr .= "&NOTIFYURL=" . urlencode( add_query_arg( 'action', 'ipnhandler', admin_url('admin-ajax.php') ) );
 			//$nvpStr .= "&L_BILLINGTYPE0=RecurringPayments&L_BILLINGAGREEMENTDESCRIPTION0=" . $order->PaymentAmount;
 
-			$nvpStr .= "&CUSTIP=" . $_SERVER['REMOTE_ADDR'] . "&INVNUM=" . $order->code;
+			$nvpStr .= "&CUSTIP=" . pmpro_get_ip() . "&INVNUM=" . $order->code;
 
 			if(!empty($order->accountnumber))
 				$nvpStr .= "&ACCT=" . $order->accountnumber . "&EXPDATE=" . $order->expirationmonth . substr($order->expirationyear, 2, 2) . "&CVV2=" . $order->CVV2;
@@ -368,7 +410,7 @@
 			//taxes on the amount
 			$amount = $order->PaymentAmount;
 			$amount_tax = $order->getTaxForPrice($amount);
-			$amount = round((float)$amount + (float)$amount_tax, 2);
+			$amount = pmpro_round_price_as_string((float)$amount + (float)$amount_tax);
 
 			if($order->BillingPeriod == "Day")
 				$payperiod = "DAYS";
@@ -381,9 +423,21 @@
 
 			//paypal profile stuff
 			$nvpStr = "&ACTION=A";
+
+			/*
+			 * Card on File is now required.
+			 *
+			 * CITR: The customer just performed an action to make the transaction.
+			 * MITR: The customer passively approved during CITR to make this subsequent (recurring) transaction.
+			 *
+			 * @link https://developer.paypal.com/docs/payflow/integration-guide/card-on-file/
+			 */
+			$nvpStr .="&CARDONFILE=CITR";
+
 			$nvpStr .="&AMT=" . $amount . "&TAXAMT=" . $amount_tax . "&CURRENCY=" . $pmpro_currency;
+
 			/* PayFlow Pro doesn't use IPN so this is a little confusing */
-			// $nvpStr .= "&NOTIFYURL=" . urlencode(admin_url('admin-ajax.php') . "?action=ipnhandler");
+			// $nvpStr .= "&NOTIFYURL=" . urlencode( add_query_arg( 'action', 'ipnhandler', admin_url('admin-ajax.php') ) );
 			//$nvpStr .= "&L_BILLINGTYPE0=RecurringPayments&L_BILLINGAGREEMENTDESCRIPTION0=" . $order->PaymentAmount;
 
 			$nvpStr .= "&PROFILENAME=" . urlencode( apply_filters( 'pmpro_paypal_level_description', substr($order->membership_level->name . " at " . get_bloginfo("name"), 0, 127), $order->membership_level->name, $order, get_bloginfo("name")) );
@@ -391,7 +445,7 @@
 			$nvpStr .= "&PAYPERIOD=" . $payperiod;
 			$nvpStr .= "&FREQUENCY=" . $order->BillingFrequency;
 
-			$nvpStr .= "&CUSTIP=" . $_SERVER['REMOTE_ADDR']; // . "&INVNUM=" . $order->code;
+			$nvpStr .= "&CUSTIP=" . pmpro_get_ip(); // . "&INVNUM=" . $order->code;
 
 			//if billing cycles are defined
 			if(!empty($order->TotalBillingCycles))
@@ -417,7 +471,7 @@
 				$trial_period_days = $order->BillingFrequency * 30;	//assume monthly
 
 			//convert to a profile start date
-			$order->ProfileStartDate = date_i18n("Y-m-d", strtotime("+ " . $trial_period_days . " Day", current_time("timestamp"))) . "T0:0:0";
+			$order->ProfileStartDate = date_i18n("Y-m-d\TH:i:s", strtotime("+ " . $trial_period_days . " Day", current_time("timestamp")));
 
 			//filter the start date
 			$order->ProfileStartDate = apply_filters("pmpro_profile_start_date", $order->ProfileStartDate, $order);
@@ -440,7 +494,7 @@
 			}
 
 			//convert back into a date
-			$order->ProfileStartDate = date_i18n("Y-m-d", strtotime("+ " . $trial_period_days . " Day", current_time("timestamp"))) . "T0:0:0";
+			$order->ProfileStartDate = date_i18n("Y-m-d\TH:i:s", strtotime("+ " . $trial_period_days . " Day", current_time("timestamp")));
 
 			//start date
 			$nvpStr .= "&START=" . date_i18n("mdY", strtotime($order->ProfileStartDate));
@@ -488,12 +542,23 @@
 
 			//paypal profile stuff
 			$nvpStr = "&ORIGPROFILEID=" . $order->subscription_transaction_id . "&ACTION=M";
+
+			/*
+			 * Card on File is now required.
+			 *
+			 * CITR: The customer just performed an action to make the transaction.
+			 * MITR: The customer passively approved during CIT to make this subsequent (recurring) transaction.
+			 *
+			 * @link https://developer.paypal.com/docs/payflow/integration-guide/card-on-file/
+			 */
+			$nvpStr .= "&CARDONFILE=CITR";
+
 			/* PayFlow Pro doesn't use IPN so this is a little confusing */
-			// $nvpStr .= "&NOTIFYURL=" . urlencode(admin_url('admin-ajax.php') . "?action=ipnhandler");
+			// $nvpStr .= "&NOTIFYURL=" . urlencode( add_query_arg( 'action', 'ipnhandler', admin_url('admin-ajax.php') ) );
 
 			$nvpStr .= "&PROFILENAME=" . urlencode( apply_filters( 'pmpro_paypal_level_description', substr($order->membership_level->name . " at " . get_bloginfo("name"), 0, 127), $order->membership_level->name, $order, get_bloginfo("name")) );
 
-			$nvpStr .= "&CUSTIP=" . $_SERVER['REMOTE_ADDR']; // . "&INVNUM=" . $order->code;
+			$nvpStr .= "&CUSTIP=" . pmpro_get_ip(); // . "&INVNUM=" . $order->code;
 
 			if(!empty($order->accountnumber))
 				$nvpStr .= "&ACCT=" . $order->accountnumber . "&EXPDATE=" . $order->expirationmonth . substr($order->expirationyear, 2, 2) . "&CVV2=" . $order->CVV2;
@@ -578,17 +643,17 @@
 			global $gateway_environment;
 			$environment = $gateway_environment;
 
-			$PARTNER = pmpro_getOption("payflow_partner");
-			$VENDOR = pmpro_getOption("payflow_vendor");
-			$USER = pmpro_getOption("payflow_user");
-			$PWD = pmpro_getOption("payflow_pwd");
+			$PARTNER = get_option("pmpro_payflow_partner");
+			$VENDOR = get_option("pmpro_payflow_vendor");
+			$USER = get_option("pmpro_payflow_user");
+			$PWD = get_option("pmpro_payflow_pwd");
 			$API_Endpoint = "https://payflowpro.paypal.com";
 			if("sandbox" === $environment || "beta-sandbox" === $environment) {
 				$API_Endpoint = "https://pilot-payflowpro.paypal.com";
 			}
 
 			$version = urlencode('4');
-			
+
 			// NVPRequest for submitting to server
 			$nvpreq = "TRXTYPE=" . $methodName_ . "&TENDER=C&PARTNER=" . $PARTNER . "&VENDOR=" . $VENDOR . "&USER=" . $USER . "&PWD=" . $PWD . "&VERBOSITY=medium" . "&BUTTONSOURCE=" . urlencode(PAYPAL_BN_CODE) . $nvpStr_;
 
@@ -605,14 +670,14 @@
 
 			if ( is_wp_error( $response ) ) {
 			   $error_message = $response->get_error_message();
-			   wp_die( "{$methodName_} failed: $error_message" );
+			   wp_die( esc_html( "{$methodName_} failed: $error_message" ) );
 			} else {
 				//extract the response details
 				parse_str(wp_remote_retrieve_body($response), $httpParsedResponseAr);
 
 				//check for valid response
 				if((0 == sizeof($httpParsedResponseAr)) || !array_key_exists('RESULT', $httpParsedResponseAr)) {
-					exit("Invalid HTTP Response for POST request($nvpreq) to $API_Endpoint.");
+					exit( esc_html( "Invalid HTTP Response for POST request($nvpreq) to $API_Endpoint.") );
 				}
 			}
 

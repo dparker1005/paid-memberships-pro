@@ -1,16 +1,20 @@
 # Stripe PHP bindings
 
-[![Build Status](https://travis-ci.org/stripe/stripe-php.svg?branch=master)](https://travis-ci.org/stripe/stripe-php)
+[![Build Status](https://github.com/stripe/stripe-php/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/stripe/stripe-php/actions?query=branch%3Amaster)
 [![Latest Stable Version](https://poser.pugx.org/stripe/stripe-php/v/stable.svg)](https://packagist.org/packages/stripe/stripe-php)
 [![Total Downloads](https://poser.pugx.org/stripe/stripe-php/downloads.svg)](https://packagist.org/packages/stripe/stripe-php)
 [![License](https://poser.pugx.org/stripe/stripe-php/license.svg)](https://packagist.org/packages/stripe/stripe-php)
 [![Code Coverage](https://coveralls.io/repos/stripe/stripe-php/badge.svg?branch=master)](https://coveralls.io/r/stripe/stripe-php?branch=master)
 
-You can sign up for a Stripe account at https://stripe.com.
+The Stripe PHP library provides convenient access to the Stripe API from
+applications written in the PHP language. It includes a pre-defined set of
+classes for API resources that initialize themselves dynamically from API
+responses which makes it compatible with a wide range of versions of the Stripe
+API.
 
 ## Requirements
 
-PHP 5.3.3 and later.
+PHP 5.6.0 and later.
 
 ## Composer
 
@@ -20,7 +24,7 @@ You can install the bindings via [Composer](http://getcomposer.org/). Run the fo
 composer require stripe/stripe-php
 ```
 
-To use the bindings, use Composer's [autoload](https://getcomposer.org/doc/00-intro.md#autoloading):
+To use the bindings, use Composer's [autoload](https://getcomposer.org/doc/01-basic-usage.md#autoloading):
 
 ```php
 require_once('vendor/autoload.php');
@@ -36,11 +40,11 @@ require_once('/path/to/stripe-php/init.php');
 
 ## Dependencies
 
-The bindings require the following extension in order to work properly:
+The bindings require the following extensions in order to work properly:
 
-- [`curl`](https://secure.php.net/manual/en/book.curl.php), although you can use your own non-cURL client if you prefer
-- [`json`](https://secure.php.net/manual/en/book.json.php)
-- [`mbstring`](https://secure.php.net/manual/en/book.mbstring.php) (Multibyte String)
+-   [`curl`](https://secure.php.net/manual/en/book.curl.php), although you can use your own non-cURL client if you prefer
+-   [`json`](https://secure.php.net/manual/en/book.json.php)
+-   [`mbstring`](https://secure.php.net/manual/en/book.mbstring.php) (Multibyte String)
 
 If you use Composer, these dependencies should be handled automatically. If you install manually, you'll want to make sure that these extensions are available.
 
@@ -49,30 +53,41 @@ If you use Composer, these dependencies should be handled automatically. If you 
 Simple usage looks like:
 
 ```php
-\Stripe\Stripe::setApiKey('sk_test_BQokikJOvBiI2HlWgH4olfQ2');
-$charge = \Stripe\Charge::create(array('amount' => 2000, 'currency' => 'usd', 'source' => 'tok_189fqt2eZvKYlo2CTGBeg6Uq' ));
-echo $charge;
+$stripe = new \Stripe\StripeClient('sk_test_BQokikJOvBiI2HlWgH4olfQ2');
+$customer = $stripe->customers->create([
+    'description' => 'example customer',
+    'email' => 'email@example.com',
+    'payment_method' => 'pm_card_visa',
+]);
+echo $customer;
 ```
+
+### Client/service patterns vs legacy patterns
+
+You can continue to use the legacy integration patterns used prior to version [7.33.0](https://github.com/stripe/stripe-php/blob/master/CHANGELOG.md#7330---2020-05-14). Review the [migration guide](https://github.com/stripe/stripe-php/wiki/Migration-to-StripeClient-and-services-in-7.33.0) for the backwards-compatible client/services pattern changes.
 
 ## Documentation
 
-Please see https://stripe.com/docs/api for up-to-date documentation.
+See the [PHP API docs](https://stripe.com/docs/api/?lang=php#intro).
+
+See [video demonstrations][youtube-playlist] covering how to use the library.
 
 ## Legacy Version Support
 
-If you are using PHP 5.2, you can download v1.18.0 ([zip](https://github.com/stripe/stripe-php/archive/v1.18.0.zip), [tar.gz](https://github.com/stripe/stripe-php/archive/v1.18.0.tar.gz)) from our [releases page](https://github.com/stripe/stripe-php/releases). This version will continue to work with new versions of the Stripe API for all common uses.
+### PHP 5.4 & 5.5
 
-This legacy version may be included via `require_once("/path/to/stripe-php/lib/Stripe.php");`, and used like:
+If you are using PHP 5.4 or 5.5, you should consider upgrading your environment as those versions have been past end of life since September 2015 and July 2016 respectively.
+Otherwise, you can still use Stripe by downloading stripe-php v6.43.1 ([zip](https://github.com/stripe/stripe-php/archive/v6.43.1.zip), [tar.gz](https://github.com/stripe/stripe-php/archive/6.43.1.tar.gz)) from our [releases page](https://github.com/stripe/stripe-php/releases). This version will work but might not support recent features we added since the version was released and upgrading PHP is the best course of action.
 
-```php
-Stripe::setApiKey('d8e8fca2dc0f896fd7cb4cb0031ba249');
-$charge = Stripe_Charge::create(array('source' => 'tok_XXXXXXXX', 'amount' => 2000, 'currency' => 'usd'));
-echo $charge;
-```
+### PHP 5.3
+
+If you are using PHP 5.3, you should upgrade your environment as this version has been past end of life since August 2014.
+Otherwise, you can download v5.9.2 ([zip](https://github.com/stripe/stripe-php/archive/v5.9.2.zip), [tar.gz](https://github.com/stripe/stripe-php/archive/v5.9.2.tar.gz)) from our [releases page](https://github.com/stripe/stripe-php/releases). This version will continue to work with new versions of the Stripe API for all common uses.
 
 ## Custom Request Timeouts
 
-*NOTE:* We do not recommend decreasing the timeout for non-read-only calls (e.g. charge creation), since even if you locally timeout, the request on Stripe's side can still complete. If you are decreasing timeouts on these calls, make sure to use [idempotency tokens](https://stripe.com/docs/api/php#idempotent_requests) to avoid executing the same transaction twice as a result of timeout retry logic.
+> **Note**
+> We do not recommend decreasing the timeout for non-read-only calls (e.g. charge creation), since even if you locally timeout, the request on Stripe's side can still complete. If you are decreasing timeouts on these calls, make sure to use [idempotency tokens](https://stripe.com/docs/api/?lang=php#idempotent_requests) to avoid executing the same transaction twice as a result of timeout retry logic.
 
 To modify request timeouts (connect or total, in seconds) you'll need to tell the API client to use a CurlClient other than its default. You'll set the timeouts in that CurlClient.
 
@@ -97,7 +112,7 @@ Need to set a proxy for your requests? Pass in the requisite `CURLOPT_*` array t
 
 ```php
 // set up your tweaked Curl client
-$curl = new \Stripe\HttpClient\CurlClient(array(CURLOPT_PROXY => 'proxy.local:80'));
+$curl = new \Stripe\HttpClient\CurlClient([CURLOPT_PROXY => 'proxy.local:80']);
 // tell Stripe to use the tweaked client
 \Stripe\ApiRequestor::setHttpClient($curl);
 ```
@@ -114,6 +129,17 @@ end up there instead of `error_log`:
 \Stripe\Stripe::setLogger($logger);
 ```
 
+### Accessing response data
+
+You can access the data from the last API response on any object via `getLastResponse()`.
+
+```php
+$customer = $stripe->customers->create([
+    'description' => 'example customer',
+]);
+echo $customer->getLastResponse()->headers['Request-Id'];
+```
+
 ### SSL / TLS compatibility issues
 
 Stripe's API now requires that [all connections use TLS 1.2](https://stripe.com/blog/upgrading-tls). Some systems (most notably some older CentOS and RHEL versions) are capable of using TLS 1.2 but will use TLS 1.0 or 1.1 by default. In this case, you'd get an `invalid_request_error` with the following error message: "Stripe no longer supports API requests made with TLS 1.0. Please initiate HTTPS connections with TLS 1.2 or later. You can learn more about this at [https://stripe.com/blog/upgrading-tls](https://stripe.com/blog/upgrading-tls).".
@@ -121,19 +147,108 @@ Stripe's API now requires that [all connections use TLS 1.2](https://stripe.com/
 The recommended course of action is to [upgrade your cURL and OpenSSL packages](https://support.stripe.com/questions/how-do-i-upgrade-my-stripe-integration-from-tls-1-0-to-tls-1-2#php) so that TLS 1.2 is used by default, but if that is not possible, you might be able to solve the issue by setting the `CURLOPT_SSLVERSION` option to either `CURL_SSLVERSION_TLSv1` or `CURL_SSLVERSION_TLSv1_2`:
 
 ```php
-$curl = new \Stripe\HttpClient\CurlClient(array(CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1));
+$curl = new \Stripe\HttpClient\CurlClient([CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1]);
 \Stripe\ApiRequestor::setHttpClient($curl);
 ```
 
+### Per-request Configuration
+
+For apps that need to use multiple keys during the lifetime of a process, like
+one that uses [Stripe Connect][connect], it's also possible to set a
+per-request key and/or account:
+
+```php
+$customers = $stripe->customers->all([],[
+    'api_key' => 'sk_test_...',
+    'stripe_account' => 'acct_...'
+]);
+
+$stripe->customers->retrieve('cus_123456789', [], [
+    'api_key' => 'sk_test_...',
+    'stripe_account' => 'acct_...'
+]);
+```
+
+### Configuring CA Bundles
+
+By default, the library will use its own internal bundle of known CA
+certificates, but it's possible to configure your own:
+
+```php
+\Stripe\Stripe::setCABundlePath("path/to/ca/bundle");
+```
+
+### Configuring Automatic Retries
+
+The library can be configured to automatically retry requests that fail due to
+an intermittent network problem:
+
+```php
+\Stripe\Stripe::setMaxNetworkRetries(2);
+```
+
+[Idempotency keys][idempotency-keys] are added to requests to guarantee that
+retries are safe.
+
+### Request latency telemetry
+
+By default, the library sends request latency telemetry to Stripe. These
+numbers help Stripe improve the overall latency of its API for all users.
+
+You can disable this behavior if you prefer:
+
+```php
+\Stripe\Stripe::setEnableTelemetry(false);
+```
+
+### Beta SDKs
+
+Stripe has features in the beta phase that can be accessed via the beta version of this package.
+We would love for you to try these and share feedback with us before these features reach the stable phase.
+Use the `composer require` command with an exact version specified to install the beta version of the stripe-php pacakge.
+
+
+```bash
+composer require stripe/stripe-php:v9.2.0-beta.1
+```
+
+> **Note**
+> There can be breaking changes between beta versions. Therefore we recommend pinning the package version to a specific beta version in your composer.json file. This way you can install the same version each time without breaking changes unless you are intentionally looking for the latest beta version.
+
+We highly recommend keeping an eye on when the beta feature you are interested in goes from beta to stable so that you can move from using a beta version of the SDK to the stable version.
+
+If your beta feature requires a `Stripe-Version` header to be sent, use the `apiVersion` property of `config` object to set it:
+
+```php
+Stripe::setApiVersion(Stripe::getApiVersion() . '; feature_beta=v3');
+```
+
+## Support
+
+New features and bug fixes are released on the latest major version of the Stripe PHP library. If you are on an older major version, we recommend that you upgrade to the latest in order to use the new features and bug fixes including those for security vulnerabilities. Older major versions of the package will continue to be available for use, but will not be receiving any updates.
+
 ## Development
+
+Get [Composer][composer]. For example, on Mac OS:
+
+```bash
+brew install composer
+```
 
 Install dependencies:
 
-``` bash
+```bash
 composer install
 ```
 
-## Tests
+The test suite depends on [stripe-mock], so make sure to fetch and run it from a
+background terminal ([stripe-mock's README][stripe-mock] also contains
+instructions for installing via Homebrew and other methods):
+
+```bash
+go get -u github.com/stripe/stripe-mock
+stripe-mock
+```
 
 Install dependencies as mentioned above (which will resolve [PHPUnit](http://packagist.org/packages/phpunit/phpunit)), then you can run the test suite:
 
@@ -144,7 +259,19 @@ Install dependencies as mentioned above (which will resolve [PHPUnit](http://pac
 Or to run an individual test file:
 
 ```bash
-./vendor/bin/phpunit tests/UtilTest.php
+./vendor/bin/phpunit tests/Stripe/UtilTest.php
+```
+
+Update bundled CA certificates from the [Mozilla cURL release][curl]:
+
+```bash
+./update_certs.php
+```
+
+The library uses [PHP CS Fixer][php-cs-fixer] for code formatting. Code must be formatted before PRs are submitted, otherwise CI will fail. Run the formatter with:
+
+```bash
+./vendor/bin/php-cs-fixer fix -v .
 ```
 
 ## Attention plugin developers
@@ -161,4 +288,11 @@ The method should be called once, before any request is sent to the API. The sec
 
 See the "SSL / TLS compatibility issues" paragraph above for full context. If you want to ensure that your plugin can be used on all systems, you should add a configuration option to let your users choose between different values for `CURLOPT_SSLVERSION`: none (default), `CURL_SSLVERSION_TLSv1` and `CURL_SSLVERSION_TLSv1_2`.
 
+[composer]: https://getcomposer.org/
+[connect]: https://stripe.com/connect
+[curl]: http://curl.haxx.se/docs/caextract.html
+[idempotency-keys]: https://stripe.com/docs/api/?lang=php#idempotent_requests
+[php-cs-fixer]: https://github.com/FriendsOfPHP/PHP-CS-Fixer
 [psr3]: http://www.php-fig.org/psr/psr-3/
+[stripe-mock]: https://github.com/stripe/stripe-mock
+[youtube-playlist]: https://www.youtube.com/playlist?list=PLy1nL-pvL2M6cUbiHrfMkXxZ9j9SGBxFE
