@@ -1,4 +1,5 @@
 <?php
+#[AllowDynamicProperties]
 class PMPro_Field {
 	/**
 	 * The name of the field.
@@ -228,7 +229,7 @@ class PMPro_Field {
 	public $options = array();
 
 	/**
-	 * Whether multiple options should be selectable when using a select, seelect2, or multiselect field type.
+	 * Whether multiple options should be selectable when using a select, select2, or multiselect field type.
 	 *
 	 * @since 2.9
 	 *
@@ -287,7 +288,12 @@ class PMPro_Field {
 				$this->$key = $value;
 			}
 		}
-		
+
+		//make sure levels is an array
+		if ( ! empty( $this->levels ) && ! is_array( $this->levels ) ) {
+			$this->levels = array( $this->levels );
+		}
+
 		//make sure we have an id
 		if(empty($this->id))
 			$this->id = $this->name;
@@ -399,6 +405,10 @@ class PMPro_Field {
             //use the save date function
             $this->save_function = array($this, "saveDate");
         }
+		elseif ( $this->type == 'hidden' ) {
+			// Don't show the label for the hidden field.
+			$this->showmainlabel = false;
+		}
 
 		return true;
 	}
@@ -450,14 +460,14 @@ class PMPro_Field {
 	function saveFile($user_id, $name, $value)
 	{			
 		//setup some vars
-		$file = $_FILES[$name];
 		$user = get_userdata($user_id);
 		$meta_key = str_replace("pmprorhprefix_", "", $name);
 
 		// deleting?
 		if( isset( $_REQUEST['pmprorh_delete_file_' . $name . '_field'] ) ) {
-			$delete_old_file_name = $_REQUEST['pmprorh_delete_file_' . $name . '_field'];
+			$delete_old_file_name = sanitize_text_field( $_REQUEST['pmprorh_delete_file_' . $name . '_field'] );
 			if ( ! empty( $delete_old_file_name ) ) {
+				// Use what's saved in user meta so we don't delete any old file.
 				$old_file_meta = get_user_meta( $user->ID, $meta_key, true );					
 				if ( 
 					! empty( $old_file_meta ) && 
@@ -474,68 +484,34 @@ class PMPro_Field {
 			}
 		}
 
-		//no file?
-		if(empty($file['name'])) {
+		// If we don't have a file to upload, return.
+		if ( empty( $_FILES[ $name ] ) || empty( $_FILES[ $name ]['name'] ) ) {
 			return;
 		}
 
-		//check extension against allowed extensions
-		$filetype = wp_check_filetype_and_ext($file['tmp_name'], $file['name']);
+		// Check if we can upload the file.
+		$upload_check = pmpro_check_upload( $name );
+		if ( is_wp_error( $upload_check ) ) {
+			pmpro_setMessage( $upload_check->get_error_message(), 'pmpro_error' );
+			return;
+		}
 
-		if((!$filetype['type'] || !$filetype['ext'] ) && !current_user_can( 'unfiltered_upload' ))
-		{			
-			//we throw an error earlier, but this just bails on the upload just in case
-			return false;
-		}
-		else
-		{
-			//need to check this in case we are in class context or not
-			if(!empty($this))
-			{
-				if(!empty($this->ext))
-					$ext = $this->ext;
-				else
-					$ext = false;
-			}
-			else
-			{
-				global $pmpro_user_fields;					
-				foreach($pmpro_user_fields as $checkout_box)
-				{
-					foreach($checkout_box as $field)
-					{
-						if($field->name == $name)
-						{
-							if(!empty($field->ext))
-								$ext = $field->ext;
-							else
-								$ext = false;
-								
-							break 2;
-						}
-					}
-				}
-			}
-			
-			//check for specific extensions anyway
-			if(!empty($ext) && !in_array($filetype['ext'], $ext))
-			{
-				pmpro_setMessage(sprintf(__("Sorry, the file type for %s is not permitted for security reasons.", "pmpro"), $file['name']), "pmpro_error");
-				return false;
-			}
-		}
-		
+		// Get $file and $filetype.
+		$file = array_map( 'sanitize_text_field', $_FILES[ $name ] );
+		$filetype = wp_check_filetype_and_ext( $file['tmp_name'], $file['name'] );
+
 		/*
 			save file in uploads
 		*/
 		//check for a register helper directory in wp-content
 		$upload_dir = wp_upload_dir();
-		$pmprorh_dir = $upload_dir['basedir'] . "/pmpro-register-helper/" . $user->user_login . "/";
+		$dir_path = $upload_dir['basedir'] . "/pmpro-register-helper/" . $user->user_login . "/";
+		$dir_url  = $upload_dir['baseurl'] . "/pmpro-register-helper/" . $user->user_login . "/";
 		
 		//create the dir and subdir if needed
-		if(!is_dir($pmprorh_dir))
+		if(!is_dir($dir_path))
 		{
-			wp_mkdir_p($pmprorh_dir);
+			wp_mkdir_p($dir_path);
 		}
 					
 		//if we already have a file for this field, delete it
@@ -549,7 +525,7 @@ class PMPro_Field {
 		$filename = sanitize_file_name( $file['name'] );
 		$count = 0;
 					
-		while(file_exists($pmprorh_dir . $filename))
+		while(file_exists($dir_path . $filename))
 		{
 			if($count)
 				$filename = str_lreplace("-" . $count . "." . $filetype['ext'], "-" . strval($count+1) . "." . $filetype['ext'], $filename);
@@ -560,55 +536,60 @@ class PMPro_Field {
 			
 			//let's not expect more than 50 files with the same name
 			if($count > 50)
-				die("Error uploading file. Too many files with the same name.");									
+				die( esc_html__( "Error uploading file. Too many files with the same name.", "paid-memberships-pro" ) );
 		}
-					
+
+		$file_path = $dir_path . $filename;
+		$file_url = $dir_url . $filename;
+
 		//save file
 		if(strpos($file['tmp_name'], $upload_dir['basedir']) !== false)
 		{
 			//was uploaded and saved to $_SESSION
-			rename($file['tmp_name'], $pmprorh_dir . $filename);			
+			rename($file['tmp_name'], $file_path);			
 		}
 		else
 		{
+			// Make sure file was uploaded.
+			if ( ! is_uploaded_file( $file['tmp_name'] ) ) {
+				pmpro_setMessage( sprintf( __( 'Sorry, the file %s was not uploaded.', 'paid-memberships-pro' ), $file['name'] ), 'pmpro_error' );
+				return false;
+			}
+			
 			//it was just uploaded
-			move_uploaded_file($file['tmp_name'], $pmprorh_dir . $filename);				
+			move_uploaded_file($file['tmp_name'], $file_path);				
 		}
 		
 		// If file is an image, save a preview thumbnail.
 		if ( $filetype && 0 === strpos( $filetype['type'], 'image/' ) ) {
-			$preview_file = wp_get_image_editor( $pmprorh_dir . $filename );
+			$preview_file = wp_get_image_editor( $file_path );
 			if ( ! is_wp_error( $preview_file ) ) {
 				$preview_file->resize( 200, NULL, false );
 				$preview_file->generate_filename( 'pmprorh_preview' );
 				$preview_file = $preview_file->save();
 			}
 		}
-		
-		// Our folder in the uploads directory that we want to save files to.
-		$upload_dir = '/pmpro-register-helper/' . $user->user_login . '/';
 
-		// If multisite, prefix the directory with the current blog ID specific folder.
-		if ( is_multisite() ) {
-			$upload_dir = '/sites/' . get_current_blog_id() . $upload_dir;
+		// Swap slashes for Windows
+		$file_path = str_replace( "\\", "/", $file_path );
+		$file_url = str_replace( "\\", "/", $file_url );
+		if ( ! empty( $preview_file ) && ! is_wp_error( $preview_file ) ) {
+			$preview_file['path'] = str_replace( "\\", "/", $preview_file['path'] );
 		}
-
-		// Get the full uploads directory URL we want to save files to.
-		$upload_path = content_url( '/uploads' . $upload_dir );
 
 		$file_meta_value_array = array(
 			'original_filename'	=> $file['name'],
 			'filename'			=> $filename,
-			'fullpath'			=> $pmprorh_dir . $filename,
-			'fullurl'			=> $upload_path . $filename,
+			'fullpath'			=> $file_path,
+			'fullurl'			=> $file_url,
 			'size'				=> $file['size'],
 		);
 
 		if ( ! empty( $preview_file ) && ! is_wp_error( $preview_file ) ) {
 			$file_meta_value_array['previewpath'] = $preview_file['path'];
-			$file_meta_value_array['previewurl'] = $upload_path . $preview_file['file'];			
+			$file_meta_value_array['previewurl'] = $dir_url .  $preview_file['file'];
 		}
-
+		
 		//save filename in usermeta
 		update_user_meta($user_id, $meta_key, $file_meta_value_array );			
 	}
@@ -629,7 +610,7 @@ class PMPro_Field {
 	//echo the HTML for the field
 	function display($value = NULL)
 	{
-		echo $this->getHTML($value);
+		echo $this->getHTML($value); //phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		return;
 	}
 	
@@ -637,16 +618,16 @@ class PMPro_Field {
 	function getHTML($value = "")
 	{			
 		//vars to store HTML to be added to the beginning or end
-		$r_beginning = "";
-		$r_end = "";
+		$r_beginning = '<div class="pmpro_display-field pmpro_display-field-' . esc_attr( $this->type ) . '">';
+		$r_end = "</div>";
 
 		if($this->type == "text")
 		{
-			$r = '<input type="text" id="' . $this->id . '" name="' . $this->name . '" value="' . esc_attr(wp_unslash($value)) . '" ';
+			$r = '<input type="text" id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '" value="' . esc_attr(wp_unslash($value)) . '" ';
 			if(!empty($this->size))
-				$r .= 'size="' . $this->size . '" ';
+				$r .= 'size="' . esc_attr( $this->size ) . '" ';
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 			if(!empty($this->readonly))
 				$r .= 'readonly="readonly" ';
 			if(!empty($this->html_attributes))
@@ -655,11 +636,11 @@ class PMPro_Field {
 		}
 		elseif($this->type == "number")
 		{
-			$r = '<input type="number" pattern="\d+" id="' . $this->id . '" name="' . $this->name . '" value="' . esc_attr($value) . '" ';
+			$r = '<input type="number" pattern="\d+" id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '" value="' . esc_attr($value) . '" ';
 			if(!empty($this->size))
-				$r .= 'size="' . $this->size . '" ';
+				$r .= 'size="' . esc_attr( $this->size ) . '" ';
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 			if(!empty($this->readonly))
 				$r .= 'readonly="readonly" ';
 			if ( empty( $this->html_attributes ) ) {
@@ -677,11 +658,11 @@ class PMPro_Field {
 		}
 		elseif($this->type == "password")
 		{
-			$r = '<input type="password" id="' . $this->id . '" name="' . $this->name . '" value="' . esc_attr(wp_unslash($value)) . '" ';
+			$r = '<input type="password" id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '" value="' . esc_attr(wp_unslash($value)) . '" ';
 			if(!empty($this->size))
-				$r .= 'size="' . $this->size . '" ';
+				$r .= 'size="' . esc_attr( $this->size ) . '" ';
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 			if(!empty($this->readonly))
 				$r .= 'readonly="readonly" ';
 			if(!empty($this->html_attributes))
@@ -695,12 +676,12 @@ class PMPro_Field {
 				$value = array($value);
 							
 			if(!empty($this->multiple))
-				$r = '<select id="' . $this->id . '" name="' . $this->name . '[]" ';	//multiselect
+				$r = '<select id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '[]" ';	//multiselect
 			else
-				$r = '<select id="' . $this->id . '" name="' . $this->name . '" ';		//regular
+				$r = '<select id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '" ';		//regular
 				
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 			if(!empty($this->readonly))
 				$r .= 'disabled="disabled" ';
 			if(!empty($this->multiple))
@@ -713,12 +694,12 @@ class PMPro_Field {
 				$r .= '<option value="' . 
 					
 					
-					($ovalue) . '" ';
+					esc_attr( trim( $ovalue ) ) . '" ';
 				if(!empty($this->multiple) && in_array($ovalue, $value))
 					$r .= 'selected="selected" ';
-				elseif($ovalue == $value)
+				elseif ( ! empty( $ovalue ) && is_string( $value ) && trim( $ovalue ) == trim( $value ) )
 					$r .= 'selected="selected" ';
-				$r .= '>' . $option . "</option>\n";
+				$r .= '>' . esc_html( $option ) . "</option>\n";
 			}
 			$r .= '</select>';
 		}
@@ -728,9 +709,9 @@ class PMPro_Field {
 			if(!is_array($value))
 				$value = array($value);
 			
-			$r = '<select id="' . $this->id . '" name="' . $this->name . '[]" multiple="multiple" ';
+			$r = '<select id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '[]" multiple="multiple" ';
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 			if(!empty($this->readonly))
 				$r .= 'disabled="disabled" ';
 			if(!empty($this->html_attributes))
@@ -739,9 +720,9 @@ class PMPro_Field {
 			foreach($this->options as $ovalue => $option)
 			{
 				$r .= '<option value="' . esc_attr($ovalue) . '" ';
-				if(in_array($ovalue, $value))
+				if(in_array( trim( $ovalue ), $value ) )
 					$r .= 'selected="selected" ';
-				$r .= '>' . $option . "</option>\n";
+				$r .= '>' . esc_html( $option ) . "</option>\n";
 			}
 			$r .= '</select>';
 		}
@@ -752,7 +733,7 @@ class PMPro_Field {
 				$value = array($value);
 				
 			//build multi select
-			$r = '<select id="' . $this->id . '" name="' . $this->name . '[]" multiple="multiple" ';
+			$r = '<select id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '[]" multiple="multiple" ';
 			if(isset($this->placeholder)) {
 				$r .= 'placeholder="' . esc_attr($this->placeholder) . '" ';
 				if(empty($this->select2options)) {
@@ -762,7 +743,7 @@ class PMPro_Field {
 				$r .= 'placeholder="' . __('Choose one or more.', 'paid-memberships-pro') . '" ';
 			}				
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 			if(!empty($this->readonly))
 				$r .= 'disabled="disabled" ';
 			if(!empty($this->html_attributes))
@@ -771,15 +752,15 @@ class PMPro_Field {
 			foreach($this->options as $ovalue => $option)
 			{
 				$r .= '<option value="' . esc_attr($ovalue) . '" ';
-				if(in_array($ovalue, $value))
+				if( in_array( trim( $ovalue ), $value ) )
 					$r .= 'selected="selected" ';
-				$r .= '>' . $option . '</option>';
+				$r .= '>' . esc_html( $option ) . '</option>';
 			}
 			$r .= '</select>';
-			$r .= '<input type="hidden" name="'.$this->name.'_checkbox" value="1" />';	// Extra field so we can track unchecked boxes. Naming just for consistency.
+			$r .= '<input type="hidden" name="'. esc_attr( $this->name ) .'_checkbox" value="1" />';	// Extra field so we can track unchecked boxes. Naming just for consistency.
 			
 			if(!empty($this->select2options))
-				$r .= '<script>jQuery(document).ready(function($){ $("#' . $this->id . '").select2({' . $this->select2options . '}); });</script>';
+				$r .= '<script>jQuery(document).ready(function($){ $("#' . esc_attr( $this->id ) . '").select2({' . $this->select2options . '}); });</script>';
 			else
 				$r .= '<script>jQuery(document).ready(function($){ $("#' . $this->id . '").select2(); });</script>';
 		}
@@ -792,34 +773,34 @@ class PMPro_Field {
 			{
 				$count++;
 				$r .= '<div class="pmpro_checkout-field-radio-item">';
-				$r .= '<input type="radio" id="pmprorh_field_' . $this->name . $count . '" name="' . $this->name . '" value="' . esc_attr($ovalue) . '" ';
-				if(!empty($ovalue) && $ovalue == $value)
+				$r .= '<input type="radio" id="pmprorh_field_' . esc_attr( $this->name . $count ) . '" name="' . esc_attr( $this->name ) . '" value="' . esc_attr($ovalue) . '" ';
+				if(!empty($ovalue) && is_string($value) && trim( $ovalue ) == trim( $value ) )
 					$r .= 'checked="checked"';
 				if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 				if(!empty($this->readonly))
 					$r .= 'disabled="disabled" ';
 				if(!empty($this->html_attributes))
 					$r .= $this->getHTMLAttributes();
 				$r .= ' /> ';
-				$r .= '<label class="pmprorh_radio_label" for="pmprorh_field_' . $this->name . $count . '">' . $option . '</label> &nbsp; ';
+				$r .= '<label class="pmprorh_radio_label" for="pmprorh_field_' . esc_attr( $this->name . $count ) . '">' . esc_html( $option ) . '</label> &nbsp; ';
 				$r .= '</div> <!-- end pmpro_checkout-field-radio-item -->';
 			}
 			$r .= '</div> <!-- end pmpro_checkout-field-radio-items -->';
 		}
 		elseif($this->type == "checkbox")
 		{
-			$r = '<input name="'.$this->name.'"' .' type="checkbox" value="1"'.' id="'.$this->id.'"';
+			$r = '<input name="'. esc_attr( $this->name ) .'"' .' type="checkbox" value="1"'.' id="'. esc_attr( $this->id ) .'"';
 			$r.=checked( $value, 1,false);
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';		
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';		
 			if(!empty($this->readonly))
 				$r .= 'disabled="disabled" ';
 			if(!empty($this->html_attributes))
 				$r .= $this->getHTMLAttributes();		
 			$r .= ' /> ';
-			$r .= '<label class="pmprorh_checkbox_label" for="' . $this->name . '">' . $this->text . '</label> &nbsp; ';
-			$r .= '<input type="hidden" name="'.$this->name.'_checkbox" value="1" />';	//extra field so we can track unchecked boxes
+			$r .= '<label class="pmprorh_checkbox_label" for="' . esc_attr( $this->name ) . '">' . wp_kses_post( $this->text )  . '</label>';
+			$r .= '<input type="hidden" name="'. esc_attr( $this->name ) .'_checkbox" value="1" />';	//extra field so we can track unchecked boxes
 		}
 		
 		elseif($this->type == "checkbox_grouped")
@@ -839,30 +820,29 @@ class PMPro_Field {
 			    $r .= sprintf( '<li><span class="pmprorh_checkbox_span">' );
 				$r .= sprintf(
                     '<input name="%1$s[]" type="checkbox" value="%2$s" id="%3$s" class="%4$s" %5$s %6$s %7$s />',
-                     $this->name,
-                    $ovalue,
-					"{$this->id}_{$counter}",
-                    $this->id . ' ' . str_replace( 'pmpro_required pmpro-required', '', $class ), // Don't show every option as required.
+                    esc_attr( $this->name ),
+                    esc_html( $ovalue ),
+					esc_attr( "{$this->id}_{$counter}" ),
+                    esc_attr( $this->id . ' ' . str_replace( 'pmpro_required pmpro-required', '', $class ) ), // Don't show every option as required.
                     ( in_array($ovalue, $value) ? 'checked="checked"' : null ),
                     ( !empty( $this->readonly ) ? 'readonly="readonly"' : null ),
                     $this->getHTMLAttributes()
 				);     
 				
-				$r .= sprintf( ' <label class="pmprorh_checkbox_label pmpro_label-inline pmpro_clickable" for="%1$s">%2$s</label>', "{$this->id}_{$counter}",$option );
-				$r .= sprintf( '<input type="hidden" name="%1$s_checkbox[]" value="%2$s" />', $this->name, $ovalue );	//extra field so we can track unchecked boxes
+				$r .= sprintf( ' <label class="pmprorh_checkbox_label pmpro_label-inline pmpro_clickable" for="%1$s">%2$s</label>', esc_attr( "{$this->id}_{$counter}" ), esc_html( $option ) );
+				$r .= sprintf( '<input type="hidden" name="%1$s_checkbox[]" value="%2$s" />', esc_attr( $this->name ), esc_attr( $ovalue ) );	//extra field so we can track unchecked boxes
                 $counter++;
 				$r .= sprintf( '</span></li>' );
 			}
 			
 			$r .= sprintf( '</ul></div>' );
 			
-		}
-		
+		}	
 		elseif($this->type == "textarea")
 		{
-			$r = '<textarea id="' . $this->id . '" name="' . $this->name . '" rows="' . $this->rows . '" cols="' . $this->cols . '" ';
+			$r = '<textarea id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '" rows="' . $this->rows . '" cols="' . esc_attr( $this->cols ) . '" ';
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 			if(!empty($this->readonly))
 				$r .= 'readonly="readonly" ';
 			if(!empty($this->html_attributes))
@@ -871,9 +851,9 @@ class PMPro_Field {
 		}
 		elseif($this->type == "hidden")
 		{
-			$r = '<input type="hidden" id="' . $this->id . '" name="' . $this->name . '" value="' . esc_attr(wp_unslash($value)) . '" ';
+			$r = '<input type="hidden" id="' . esc_attr( $this->id ) . '" name="' . esc_attr( $this->name ) . '" value="' . esc_attr(wp_unslash($value)) . '" ';
 			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
 			if(!empty($this->readonly))
 				$r .= 'readonly="readonly" ';
 			if(!empty($this->html_attributes))
@@ -891,18 +871,6 @@ class PMPro_Field {
 		elseif($this->type == "file")
 		{
 			$r = '';
-							
-			//file input
-			$r .= '<input type="file" id="' . $this->id . '" ';
-			if(!empty($this->accept))
-				$r .= 'accept="' . esc_attr($this->accept) . '" ';
-			if(!empty($this->class))
-				$r .= 'class="' . $this->class . '" ';
-			if(!empty($this->html_attributes))
-				$r .= $this->getHTMLAttributes();
-			if(!empty($this->readonly))
-				$r .= 'disabled="disabled" ';
-			$r .= 'name="' . $this->name . '" />';
 
 			//old value
 			if(is_user_logged_in())
@@ -913,65 +881,98 @@ class PMPro_Field {
 					$r .= '<input type="hidden" name="' . $this->name . '_old" value="' . esc_attr($old_value['filename']) . '" />';
 			}
 
-			// Show a preview of existing file if image type.
-			if ( ( ! empty( $this->preview ) ) && ! empty( $value ) && ! empty( $this->file['previewurl'] ) ) {
-				$filetype = wp_check_filetype( basename( $this->file['previewurl'] ), null );
-				if ( $filetype && 0 === strpos( $filetype['type'], 'image/' ) ) {
-					$r_end .= '<div class="pmprorh_file_preview"><img src="' . $this->file['previewurl'] . '" alt="' . basename($value) . '" /></div>';
-				}
-			}
+			// Show the existing file with a preview and allow user to delete or replace.
+			if ( ! empty( $value ) ) {
 
-			//show name of existing file
-			if(!empty($value))
-			{
+				// Show a preview of existing file if image type.
+				if ( ( ! empty( $this->preview ) ) && ! empty( $this->file['previewurl'] ) ) {
+					$filetype = wp_check_filetype( basename( $this->file['previewurl'] ), null );
+					if ( $filetype && 0 === strpos( $filetype['type'], 'image/' ) ) {
+						$r_beginning .= '<div class="pmprorh_file_preview"><img src="' . esc_url( $this->file['previewurl'] ) . '" alt="' . esc_attr( basename($value) ) . '" /></div>';
+					}
+				}
+
 				if( ! empty( $this->file['fullurl'] ) ) {										
-					$r_end .= '<span class="pmprorh_file_' . $this->name . '_name">' . sprintf(__('Current File: %s', 'paid-memberships-pro' ), '<a target="_blank" href="' . $this->file['fullurl'] . '">' . basename($value) . '</a>' ) . '</span>';
+					$r_beginning .= '<div class="pmprorh_file_' . esc_attr( $this->name ) . '_name">' . sprintf(__('Current File: %s', 'paid-memberships-pro' ), '<a target="_blank" href="' . esc_url( $this->file['fullurl'] ) . '">' . esc_html( basename($value) ) . '</a>' ) . '</div>';
 				} else {
-					$r_end .= sprintf(__('Current File: %s', 'paid-memberships-pro' ), basename($value) );
+					$r_beginning .= sprintf(__('Current File: %s', 'paid-memberships-pro' ), basename($value) );
 				}
 
 				// Allow user to delete the uploaded file if we know the full location. 
 				if ( ( ! empty( $this->allow_delete ) ) && ! empty( $this->file['fullurl'] ) ) {
 					// Check whether the current user can delete the uploaded file based on the field attribute 'allow_delete'.
 					if ( $this->allow_delete === true || 
-						( $this->allow_delete === 'admins' || $this->allow_delete === 'only_admin' && current_user_can( 'manage_options', $current_user->ID ) )
+						( $this->allow_delete === 'admins' || $this->allow_delete === 'only_admin' && current_user_can( 'manage_options' ) )
 					) {
-						$r_end .= '&nbsp;&nbsp;<button class="pmprorh_delete_restore_file" id="pmprorh_delete_file_' . $this->name . '_button" onclick="return false;">' . __( '[delete]', 'paid-memberships-pro' ) . '</button>';
-					$r_end .= '<button class="pmprorh_delete_restore_file" id="pmprorh_cancel_delete_file_' . $this->name . '_button" style="display: none;" onclick="return false;">' . __( '[restore]', 'paid-memberships-pro' ) . '</button>';
-					$r_end .= '<input id="pmprorh_delete_file_' . $this->name . '_field" name="pmprorh_delete_file_' . $this->name . '_field" type="hidden" value="0" />';
+						$r_beginning .= '<button class="button is-destructive pmprorh_delete_file" id="pmprorh_delete_file_' . esc_attr( $this->name ) . '_button" onclick="return false;">' . __( 'Delete', 'paid-memberships-pro' ) . '</button>';
 					}
 				}
+
+				if( empty( $this->readonly ) ) {
+					$r_beginning .= '<button class="button button-secondary pmprorh_replace_file" id="pmprorh_replace_file_' . esc_attr( $this->name ) . '_button" onclick="return false;">' . __( 'Replace', 'paid-memberships-pro' ) . '</button>';
+					$r_beginning .= '<button class="button button-secondary pmprorh_cancel_change_file" id="pmprorh_cancel_change_file_' . esc_attr( $this->name ) . '_button" style="display: none;" onclick="return false;">' . __( 'Cancel', 'paid-memberships-pro' ) . '</button>';
+					$r_beginning .= '<input id="pmprorh_delete_file_' . esc_attr( $this->name ) . '_field" name="pmprorh_delete_file_' . esc_attr( $this->name ) . '_field" type="hidden" value="0" />';
+				}				
 			}
 			
 			//include script to change enctype of the form and allow deletion
 			$r .= '
 			<script>
 				jQuery(document).ready(function() {
-					jQuery("#' . $this->id . '").closest("form").attr("enctype", "multipart/form-data");
+					jQuery("#' . esc_attr( $this->id ) . '").closest("form").attr("enctype", "multipart/form-data");
 
-					jQuery("#pmprorh_delete_file_' . $this->name . '_button").click(function(){
-						jQuery("#pmprorh_delete_file_' . $this->name . '_field").val("' . basename($value) . '");
-						jQuery(".pmprorh_file_' . $this->name . '_name").css("text-decoration", "line-through");
-						jQuery("#pmprorh_cancel_delete_file_' . $this->name . '_button").show();
-						jQuery("#pmprorh_delete_file_' . $this->name . '_button").hide();
+					jQuery("#pmprorh_delete_file_' . esc_attr( $this->name ) . '_button").on("click",function(){
+						jQuery("#pmprorh_delete_file_' . esc_attr( $this->name ) . '_field").val("' . esc_attr( basename($value) ) . '");
+						jQuery(".pmprorh_file_' . esc_attr( $this->name ) . '_name").css("text-decoration", "line-through");
+						jQuery("#pmprorh_cancel_change_file_' . esc_attr( $this->name ) . '_button").show();
+						jQuery("#pmprorh_delete_file_' . esc_attr( $this->name ) . '_button").hide();
+						jQuery("#pmprorh_replace_file_' . esc_attr( $this->name ) . '_button").hide();
+						jQuery("#pmprorh_file_' . esc_attr( $this->id ) . '_upload").hide();
 					});
 
-					jQuery("#pmprorh_cancel_delete_file_' . $this->name . '_button").click(function(){
-						jQuery("#pmprorh_delete_file_' . $this->name . '_field").val(0);
-						jQuery(".pmprorh_file_' . $this->name . '_name").css("text-decoration", "none");
-						jQuery("#pmprorh_delete_file_' . $this->name . '_button").show();
-						jQuery("#pmprorh_cancel_delete_file_' . $this->name . '_button").hide();
+					jQuery("#pmprorh_replace_file_' . esc_attr( $this->name ) . '_button").on("click",function(){
+						jQuery("#pmprorh_delete_file_' . esc_attr( $this->name ) . '_field").val("' . esc_attr( basename($value) ) . '");
+						jQuery(".pmprorh_file_' . esc_attr( $this->name ) . '_name").css("text-decoration", "line-through");
+						jQuery("#pmprorh_cancel_change_file_' . esc_attr( $this->name ) . '_button").show();
+						jQuery("#pmprorh_delete_file_' . esc_attr( $this->name ) . '_button").hide();
+						jQuery("#pmprorh_replace_file_' . esc_attr( $this->name ) . '_button").hide();
+						jQuery("#pmprorh_file_' . esc_attr( $this->id ) . '_upload").show();
 					});
+
+					jQuery("#pmprorh_cancel_change_file_' . esc_attr( $this->name ) . '_button").on("click",function(){
+						jQuery("#pmprorh_delete_file_' . esc_attr( $this->name ) . '_field").val(0);
+						jQuery(".pmprorh_file_' . esc_attr( $this->name ) . '_name").css("text-decoration", "none");
+						jQuery("#pmprorh_delete_file_' . esc_attr( $this->name ) . '_button").show();
+						jQuery("#pmprorh_replace_file_' . esc_attr( $this->name ) . '_button").show();
+						jQuery("#pmprorh_cancel_change_file_' . esc_attr( $this->name ) . '_button").hide();
+						jQuery("#pmprorh_file_' . esc_attr( $this->id ) . '_upload").hide();
+					});
+
 				});
 			</script>
 			';
+
+			//file input
+			$r .= '<div id="pmprorh_file_' . esc_attr( $this->id ) . '_upload" class="pmprorh_file_upload" ' . (empty($value) ? '' : 'style="display: none;"') . '>';
+			$r .= '<input type="file" id="' . esc_attr( $this->id ) . '" ';
+			if(!empty($this->accept))
+				$r .= 'accept="' . esc_attr( $this->accept ) . '" ';
+			if(!empty($this->class))
+				$r .= 'class="' . esc_attr( $this->class ) . '" ';
+			if(!empty($this->html_attributes))
+				$r .= $this->getHTMLAttributes();
+			if(!empty($this->readonly))
+				$r .= 'disabled="disabled" ';
+			$r .= 'name="' . esc_attr( $this->name ) . '" />';
+			$r .= '</div>';
+
 		}
         elseif($this->type == "date")
         {
-            $r = '<select id="' . $this->id . '_m" name="' . $this->name . '[m]"';
+            $r = '<select id="' . esc_attr( $this->id ) . '_m" name="' . esc_attr( $this->name ) . '[m]"';
 
             if(!empty($this->class))
-                $r .= ' class="' . $this->class . '"';
+                $r .= ' class="' . esc_attr( $this->class ) . '"';
 
             if(!empty($this->readonly))
                 $r .= 'disabled="disabled"';
@@ -983,12 +984,12 @@ class PMPro_Field {
 
             //setup date vars
             if(is_array($value) && !empty($value)){
-	    $value = strtotime(implode("/", $value), current_time('timestamp'));
-	}elseif(!is_array($value) && !empty($value)){
-	    $value = strtotime($value, current_time('timestamp'));
-	}else{
-	    $value = strtotime(date('Y-m-d'), current_time('timestamp'));
-	}
+				$value = strtotime(implode("/", $value), current_time('timestamp'));
+			}elseif(!is_array($value) && !empty($value)){
+				$value = strtotime($value, current_time('timestamp'));
+			}else{
+				$value = strtotime(date('Y-m-d'), current_time('timestamp'));
+			}
 
             $year = date("Y", $value);
             $month = date("n", $value);
@@ -996,19 +997,19 @@ class PMPro_Field {
 
             for($i = 1; $i < 13; $i++)
             {
-                $r .= '<option value="' . $i . '" ';
+                $r .= '<option value="' . esc_attr( $i ) . '" ';
                 if($i == $month)
                     $r .= 'selected="selected"';
 
-                $r .= '>' . date("M", strtotime($i . "/15/" . $year, current_time("timestamp"))) . '</option>';
+                $r .= '>' . esc_html( date("M", strtotime($i . "/15/" . $year, current_time("timestamp"))) ) . '</option>';
             }
 
-            $r .= '</select><input id="' . $this->id . '_d" name="' . $this->name . '[d]" type="text" size="2" value="' . $day . '" ';
+            $r .= '</select><input id="' . esc_attr( $this->id ) . '_d" name="' . esc_attr( $this->name ) . '[d]" type="text" size="2" value="' . esc_attr( $day ) . '" ';
 
             if(!empty($this->readonly))
                 $r .= 'readonly="readonly" ';
 
-            $r .= '/><input id="' . $this->id . '_y" name="' . $this->name . '[y]" type="text" size="4" value="' . $year . '" ';
+            $r .= '/><input id="' . esc_attr( $this->id ) . '_y" name="' . esc_attr( $this->name ) . '[y]" type="text" size="4" value="' . esc_attr( $year ) . '" ';
 
             if(!empty($this->readonly))
                 $r .= 'readonly="readonly" ';
@@ -1017,11 +1018,14 @@ class PMPro_Field {
         }
         elseif($this->type == "readonly")
 		{				
+			if ( empty( $value ) ) {
+				$value = '&#8212;';
+			}
 			$r = $value;
 		}
 		else
 		{
-			$r = "Unknown type <strong>" . $this->type . "</strong> for field <strong>" . $this->name . "</strong>.";
+			$r = "Unknown type <strong>" . esc_attr( $this->type ) . "</strong> for field <strong>" . esc_attr( $this->name ) . "</strong>.";
 		}
 		
 		//show required by default
@@ -1086,7 +1090,7 @@ class PMPro_Field {
 		if(!empty($this->depends))
 		{					
 			//build the checks
-			$checks = array();
+			$checks_escaped = array();
 			foreach($this->depends as $check)
 			{
 				if(!empty($check['id']))
@@ -1103,7 +1107,7 @@ class PMPro_Field {
 						}
 					}
 
-					$checks[] = "((jQuery('#" . esc_html( $field_id ) ."')".".is(':checkbox')) "
+					$checks_escaped[] = "((jQuery('#" . esc_html( $field_id ) ."')".".is(':checkbox')) "
 					 ."? jQuery('#" . esc_html( $field_id ) . ":checked').length > 0"
 					 .":(jQuery('#" . esc_html( $field_id ) . "').val() == " . json_encode($check['value']) . " || jQuery.inArray( jQuery('#" . esc_html( $field_id ) . "').val(), " . json_encode($check['value']) . ") > -1)) ||"."(jQuery(\"input:radio[name='". esc_html( $check['id'] ) ."']:checked\").val() == ".json_encode($check['value'])." || jQuery.inArray(".json_encode($check['value']).", jQuery(\"input:radio[name='". esc_html( $field_id ) ."']:checked\").val()) > -1)";
 				
@@ -1111,16 +1115,16 @@ class PMPro_Field {
 				}				
 			}
 										
-			if(!empty($checks) && !empty($binds)) {
+			if(!empty($checks_escaped) && !empty($binds)) {
 			?>
 			<script>
 				//function to check and hide/show
 				function pmprorh_<?php echo esc_html( $this->id );?>_hideshow() {						
 					let checks = [];
 					<?php
-					foreach( $checks as $check ) {
+					foreach( $checks_escaped as $check_escaped ) {
 					?>
-					checks.push(<?php echo $check?>);
+					checks.push(<?php echo $check_escaped; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>);
 					<?php
 					}
 					
@@ -1150,7 +1154,7 @@ class PMPro_Field {
 						pmprorh_<?php echo esc_html( $this->id );?>_hideshow();
 						
 						//and run when certain fields are changed
-						jQuery('<?php echo implode(',', $binds);?>').bind('click change keyup', function() {
+						jQuery('<?php echo implode(',', $binds); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>').bind('click change keyup', function() {
 							pmprorh_<?php echo esc_html( $this->id );?>_hideshow();
 						});
 				});
@@ -1185,16 +1189,16 @@ class PMPro_Field {
 				$value = "";
 			}
 		} elseif(isset($_REQUEST[$this->name])) {
-			$value = $_REQUEST[$this->name];
+			$value = pmpro_sanitize( $_REQUEST[$this->name], $this );
 		} elseif(isset($_SESSION[$this->name])) {
 			//file or value?
 			if(is_array($_SESSION[$this->name]) && !empty($_SESSION[$this->name]['name']))
 			{
 				$_FILES[$this->name] = $_SESSION[$this->name];
-				$this->file = $_SESSION[$this->name]['name'];
-				$value = $_SESSION[$this->name]['name'];
+				$this->file = pmpro_sanitize( $_SESSION[$this->name]['name'], $this );
+				$value = pmpro_sanitize( $_SESSION[$this->name]['name'], $this );
 			} else {
-				$value = $_SESSION[$this->name];
+				$value = pmpro_sanitize( $_SESSION[$this->name], $this );
 			}
 		}
 		elseif(!empty($current_user->ID) && metadata_exists("user", $current_user->ID, $this->meta_key))
@@ -1239,13 +1243,15 @@ class PMPro_Field {
 		?>
 		<div id="<?php echo esc_attr( $this->id );?>_div" class="pmpro_checkout-field<?php if(!empty($this->divclass)) echo ' ' . esc_attr( $this->divclass ); ?>">
 			<?php if(!empty($this->showmainlabel)) { ?>
-				<label for="<?php echo esc_attr($this->name);?>"><?php echo wp_kses_post( $this->label );?></label>
-				<?php 
-					if(!empty($this->required) && !empty($this->showrequired) && $this->showrequired === 'label')
-					{
-					?><span class="pmprorh_asterisk"> <abbr title="Required Field">*</abbr></span><?php
-					}
-				?>
+				<label for="<?php echo esc_attr($this->name);?>">
+					<?php echo wp_kses_post( $this->label );?>
+					<?php 
+						if(!empty($this->required) && !empty($this->showrequired) && $this->showrequired === 'label')
+						{
+						?><span class="pmpro_asterisk"> <abbr title="<?php esc_attr_e( 'Required Field' ,'paid-memberships-pro' ); ?>">*</abbr></span><?php
+						}
+					?>
+				</label>
 				<?php $this->display($value); ?>
 			<?php } else { ?>
 				<?php $this->display($value); ?>
@@ -1265,7 +1271,7 @@ class PMPro_Field {
 		global $current_user;
 		if(metadata_exists("user", $user_id, $this->meta_key))
 		{
-			$meta = get_user_meta($user_id, $this->name, true);				
+			$meta = get_user_meta($user_id, $this->meta_key, true);	
 			if(is_array($meta) && !empty($meta['filename']))
 			{
 				$this->file = get_user_meta($user_id, $this->meta_key, true);
@@ -1281,16 +1287,16 @@ class PMPro_Field {
 		?>
 		<tr id="<?php echo esc_attr( $this->id );?>_tr">
 			<th>
-				<?php if(!empty($this->showmainlabel)) { ?>
+				<?php if ( ! empty( $this->showmainlabel ) ) { ?>
 					<label for="<?php echo esc_attr($this->name);?>"><?php echo wp_kses_post( $this->label );?></label>
 				<?php } ?>
 			</th>
 			<td>
 				<?php 						
-					if(current_user_can("edit_user", $current_user->ID) && $edit !== false)
-						$this->display($value); 
+					if(current_user_can("edit_user", $user_id) && $edit !== false)
+						$this->display($value);
 					else
-						echo "<div>" . $this->displayValue($value) . "</div>";						
+						echo "<div>" . wp_kses_post( $this->displayValue($value) ) . "</div>";
 				?>
 				<?php if(!empty($this->hint)) { ?>
 					<small class="lite"><?php echo wp_kses_post( $this->hint );?></small>
@@ -1302,35 +1308,90 @@ class PMPro_Field {
 		$this->getDependenciesJS();
 	}		
 	
-	//checks for array values and values from fields with options
-	function displayValue($value)
-	{
-		if(is_array($value) && !empty($this->options))
-		{
+	/**
+	 * Echo the value of the field based on type
+	 * and taking into account fields with options.
+	 * @param mixed $value The value to be shown.
+	 * @param bool $echo Whether to echo the value or return it.
+	 * @since 3.0 Shows files as links and added echo parameter.
+	 */
+	function displayValue( $value, $echo = true ) {
+		$output = '';
+		$allowed_html = array();
+		
+		if(is_array( $value ) && ! empty( $this->options ) ) {
 			$labels = array();
-			foreach($value as $item)
-			{
+			foreach( $value as $item ) {
 				$labels[] = $this->options[$item];
 			}
+			$output .= implode( ', ', $labels);
+		} elseif( is_array( $value ) ) {
+			$output .= implode( ', ', $value );
+		} elseif( ! empty( $this->options ) && isset( $this->options[$value] ) ) {
+			$output .= $this->options[$value];
+		} elseif ( $this->type == 'checkbox' ) {
+			$output .= $value ? __( 'Yes', 'paid-memberships-pro' ) : __( 'No', 'paid-memberships-pro' );
+		} elseif ( $this->type == 'date' ) {
+			$output .= date_i18n( get_option( 'date_format' ), strtotime( $value ) );
+		} elseif ( $this->type == 'file' ) {			
+			// Show a preview of existing file if image type.
+			if ( ( ! empty( $this->preview ) ) && ! empty( $value ) && ! empty( $this->file['previewurl'] ) ) {
+				$filetype = wp_check_filetype( basename( $this->file['previewurl'] ), null );
+				if ( $filetype && 0 === strpos( $filetype['type'], 'image/' ) ) {
+					$output .= '<div class="pmprorh_file_preview"><img src="' . $this->file['previewurl'] . '" alt="' . basename($value) . '" /></div>';
+				}
+				$allowed_html['div'] = array(
+					'class' => array(),
+				);
+				$allowed_html['img'] = array(
+					'src' => array(),
+					'alt' => array(),
+				);
+			}
 
-			$output = implode( ', ', $labels);
+			// Show link to file if available, or name if not.
+			if( ! empty( $this->file ) && ! empty( $this->file['fullurl'] ) ) {
+				$output .= '<span class="pmprorh_file_' . $this->name . '_name"><a target="_blank" href="' . esc_url( $this->file['fullurl'] ) . '">' . basename($value) . '</a></span>';
+				$allowed_html['span'] = array(
+					'class' => array(),
+				);
+				$allowed_html['a'] = array(
+					'href' => array(),
+					'target' => array(),
+				);
+			} elseif( empty( $value ) ) {
+				$output .= esc_html__( 'N/A', 'paid-memberships-pro' );
+			} else {
+				$output .= sprintf(__('Current File: %s', 'paid-memberships-pro' ), basename($value) );
+			}
+		} else {
+			$output .= $value;
 		}
-		elseif(is_array($value))
-			$output = implode( ', ', $value );
-		elseif(!empty($this->options))
-			$output = $this->options[$value];
-		else
-			$output = $value;
 
 		// Enforce string as output.
 		$output = (string) $output;
 
-		echo esc_html( $output );
+		if ( $echo ) {
+			echo wp_kses( $output, $allowed_html );
+		} else {
+			return wp_kses( $output, $allowed_html );
+		}
+		
 	}
 	
-	//from: http://stackoverflow.com/questions/173400/php-arrays-a-good-way-to-check-if-an-array-is-associative-or-numeric/4254008#4254008
-	function is_assoc($array) {			
-		return (bool)count(array_filter(array_keys($array), 'is_string'));
+	/**
+	 * Defining associative as integer array keys incrementing from 0.
+	 * 
+	 * Based off of https://stackoverflow.com/a/173479.
+	 *
+	 * @param array $array The array to check if it is associative.
+	 * @return bool True if the array is associative, false otherwise.
+	 */
+	function is_assoc( $array ) {
+		if ( empty( $array ) ) {
+			return false;
+		}
+		return array_keys( $array ) !== range( 0, count( $array ) - 1) ;
 	}
 
 	static function get_checkout_box_name_for_field( $field_name ) {
@@ -1413,7 +1474,7 @@ class PMPro_Field {
 			case 'text':
 			case 'textarea':
 			case 'number':
-				$filled = ( isset( $_REQUEST[$this->name] ) && '' !== trim( $_REQUEST[$this->name] ) );
+				$filled = ( isset( $_REQUEST[$this->name] ) && '' !== trim( $_REQUEST[$this->name] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 				break;
 			default:
 				$filled = ! ( empty( $_REQUEST[$this->name] ) && empty( $_FILES[$this->name]['name'] ) && empty( $_REQUEST[$this->name.'_old'] ) );

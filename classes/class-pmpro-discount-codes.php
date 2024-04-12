@@ -1,6 +1,49 @@
 <?php
 
-class PMPro_Discount_Code{
+class PMPro_Discount_Code {
+
+	/**
+	 * Discount code id
+	 *
+	 * @var int $id
+	 */
+	public $id = 0;
+
+	/**
+	 * Discount code
+	 *
+	 * @var string $code
+	 */
+	public $code = '';
+
+	/**
+	 * When the discount code starts (YYYY-MM-DD format)
+	 *
+	 * @var string $starts
+	 */
+	public $starts = '';
+
+	/**
+	 * When the discount code expires (YYYY-MM-DD format)
+	 *
+	 * @var string $expires
+	 */
+	public $expires = '';
+
+	/**
+	 * how many times the discount code has been used. 0 means unlimited.
+	 *
+	 * @var int $uses
+	 */
+	public $uses = 0;
+
+
+	/**
+	 * Levels and billing settings tied to the discount code.
+	 *
+	 * @var array $levels
+	 */
+	public $levels = array();
 
     function __construct( $code = NULL ) {
 
@@ -104,6 +147,7 @@ class PMPro_Discount_Code{
         if ( ! empty( $dcobj ) ) {
             // Setup the discount code object.
             $this->id = $dcobj->id;
+            $this->code = $dcobj->code;
             $this->starts = $dcobj->starts;
             $this->expires = $dcobj->expires;
             $this->uses = $dcobj->uses;
@@ -197,9 +241,9 @@ class PMPro_Discount_Code{
             $after_action = 'pmpro_added_discount_code';
 
             $this->sqlQuery = "INSERT INTO $wpdb->pmpro_discount_codes ( `code`, `starts`, `expires`, `uses` ) 
-                               VALUES ('" . $this->code . "',
-                                       '" . $this->starts ."',
-                                       '" . $this->expires ."',
+                               VALUES ('" . esc_sql( $this->code ) . "',
+                                       '" . esc_sql( $this->starts ) ."',
+                                       '" . esc_sql( $this->expires ) ."',
                                        " . intval( $this->uses ) ."
                                )";                      
         } else {
@@ -208,11 +252,11 @@ class PMPro_Discount_Code{
             $after_action = 'pmpro_updated_discount_code';
 
             $this->sqlQuery = "UPDATE $wpdb->pmpro_discount_codes
-                                SET  `code` = '" . $this->code ."',
-                                    `starts` = '" . $this->starts . "',
-                                    `expires` = '" . $this->expires . "',
+                                SET  `code` = '" . esc_sql( $this->code ) ."',
+                                    `starts` = '" . esc_sql( $this->starts ) . "',
+                                    `expires` = '" . esc_sql( $this->expires ) . "',
                                     `uses` = " . intval( $this->uses ) . "
-                                WHERE code = '" . $this->code . "'
+                                WHERE code = '" . esc_sql( $this->code ) . "'
                                 LIMIT 1";
         }
 
@@ -240,7 +284,7 @@ class PMPro_Discount_Code{
                 $initial_payment = $data['initial_payment'];
                 $billing_amount = $data['billing_amount'];
                 $cycle_number = $data['cycle_number'];
-                $cycle_period = $data['cycle_period'];
+                $cycle_period = pmpro_sanitize_period( $data['cycle_period'] );
                 $billing_limit = $data['billing_limit'];
                 $trial_amount = $data['trial_amount'];
                 $trial_limit = $data['trial_limit'];
@@ -254,12 +298,12 @@ class PMPro_Discount_Code{
                         " . floatval( $initial_payment ) . ",
                         " . floatval( $billing_amount ) . ",
                         " . intval( $cycle_number ) . ",
-                        '" . $cycle_period . "',
+                        '" . esc_sql( $cycle_period ) . "',
                         " . intval( $billing_limit ) . ",
                         " . floatval( $trial_amount ) . ",
                         " . intval( $trial_limit ) . ",
                         " . intval( $expiration_number ) . ",
-                        '" . $expiration_period . "'
+                        '" . esc_sql( $expiration_period ) . "'
                 )";                
                 
                 // Run the query here.
