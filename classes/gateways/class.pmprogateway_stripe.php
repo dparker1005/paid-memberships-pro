@@ -161,13 +161,11 @@ class PMProGateway_stripe extends PMProGateway {
 				) );
 
 				add_action( 'pmpro_billing_preheader', array( 'PMProGateway_stripe', 'pmpro_checkout_after_preheader' ) );
-				add_filter( 'pmpro_checkout_order', array( 'PMProGateway_stripe', 'pmpro_checkout_order' ) );
 				add_filter( 'pmpro_billing_order', array( 'PMProGateway_stripe', 'pmpro_checkout_order' ) );
 				add_filter( 'pmpro_include_payment_information_fields', array(
 					'PMProGateway_stripe',
 					'pmpro_include_payment_information_fields'
 				) );	
-				add_filter( 'pmpro_after_checkout_preheader', array( 'PMProGateway_stripe', 'clear_pmpro_review' ) );			
 			} else {
 				// Checkout flow for Stripe Checkout.
 				add_filter('pmpro_include_payment_information_fields', array('PMProGateway_stripe', 'show_stripe_checkout_pending_warning'));
@@ -2196,6 +2194,21 @@ class PMProGateway_stripe extends PMProGateway {
 			return false;
 		}
 
+		// Add the PaymentIntent ID to the order.
+		if ( ! empty ( $_REQUEST['payment_intent_id'] ) ) {
+			$order->payment_intent_id = sanitize_text_field( $_REQUEST['payment_intent_id'] );
+		}
+
+		// Add the SetupIntent ID to the order.
+		if ( ! empty ( $_REQUEST['setup_intent_id'] ) ) {
+			$order->setup_intent_id = sanitize_text_field( $_REQUEST['setup_intent_id'] );
+		}
+
+		// Add the PaymentMethod ID to the order.
+		if ( ! empty ( $_REQUEST['payment_method_id'] ) ) {
+			$order->payment_method_id = sanitize_text_field( $_REQUEST['payment_method_id'] );
+		}
+
 		$payment_transaction_id = '';
 		$subscription_transaction_id = '';
 		
@@ -2229,7 +2242,7 @@ class PMProGateway_stripe extends PMProGateway {
 			$payment_method = $this->get_payment_method( $order );
 			if ( empty( $payment_method ) ) {
 				// There was an issue getting the payment method.
-				$order->error      = __( 'Error retrieving payment method.', 'paid-memberships-pro' ) . empty( $order->error ) ? '' : ' ' . $order->error;
+				$order->error      = __( 'Error retrieving payment method.', 'paid-memberships-pro' ) . ( empty( $order->error ) ? '' : ' ' . $order->error );
 				$order->shorterror = $order->error;
 				return false;
 			}
@@ -4651,8 +4664,11 @@ class PMProGateway_stripe extends PMProGateway {
 	 * Eventually, we want to always save orders in pending status with all of the checkout data stored in order meta, but we are not doing that yet.
 	 *
 	 * @since 3.2.1
+	 * @deprecated TBD
 	 */
 	public static function clear_pmpro_review( $pmpro_review ) {
+		_deprecated_function( __METHOD__, 'TBD' );
+
 		// If we don't have an order, bail.
 		if ( empty( $pmpro_review ) || ! is_a( $pmpro_review, 'MemberOrder' ) ) {
 			return;

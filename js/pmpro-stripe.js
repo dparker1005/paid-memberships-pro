@@ -66,7 +66,12 @@ jQuery( document ).ready( function( $ ) {
 	}
 	$( '.pmpro_form' ).submit( function( event ) {
 		// If the gateway field is present and not set to stripe, return.
-		if ( $( 'input[name="gateway"]' ).length > 0 && $( 'input[name="gateway"]:checked' ).val() !== 'stripe' ) {
+		if ( $( 'input[name="gateway"]' ).length > 0 && $( 'input[name="gateway"]:checked' ).val() !== 'stripe' && $( 'input[name="gateway"]' ).val() !== 'stripe' ) {
+			return;
+		}
+
+		// If the card number field is not present, return.
+		if ( $( '#AccountNumber' ).length === 0 ) {
 			return;
 		}
 
@@ -76,8 +81,8 @@ jQuery( document ).ready( function( $ ) {
 			return;
 		}
 
-		// If there is no "pmpro_level" input (or "level" input for legacy page templates), then this is not a checkout form. Return.
-		if ( $( 'input[name="pmpro_level"]' ).length === 0 && $( 'input[name="level"]' ).length === 0 ) {
+		// If there is no "pmpro_level" input (or "level" input for legacy page templates) or "pmpro_order" for multistep checkout, then this is not a checkout form. Return.
+		if ( $( 'input[name="pmpro_level"]' ).length === 0 && $( 'input[name="level"]' ).length === 0 && $( 'input[name="pmpro_order"]' ).length === 0 ) {
 			return;
 		}
 

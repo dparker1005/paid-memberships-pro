@@ -46,6 +46,7 @@
 				'currency',
 				'tax_state',
 				'tax_rate',
+				'separate_payment_step',
 				'tax_settings_beta',
 			);
 			foreach ( $global_settings as $setting ) {
@@ -302,6 +303,16 @@
 										printf( esc_html__('US only. If values are given, tax will be applied for any members ordering from the selected state. For non-US or more complex tax rules, use the %s.', 'paid-memberships-pro' ), $filter_link ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 									?>
 								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row" valign="top">
+								<label for="separate_payment_step"><?php esc_html_e('Separate Payment Step', 'paid-memberships-pro' );?></label>
+							</th>
+							<td>
+								<input type="checkbox" id="separate_payment_step" name="separate_payment_step" value="1" <?php checked( pmpro_getOption( 'separate_payment_step' ), 1 ); ?> />
+								<label for="separate_payment_step"><?php esc_html_e('Enable having a separate payment step at checkout.', 'paid-memberships-pro' );?></label>
+								<p class="description"><?php esc_html_e('This feature improves the stability of checkout, allows enabling multiple gateways at once, and lets users view their total before completing payment.', 'paid-memberships-pro' ); ?></p>
 							</td>
 						</tr>
 					</tbody>

@@ -1,12 +1,12 @@
 <?php
 /**
  * Template: Checkout
- * Version: 3.5
+ * Version: TBD
  *
  * See documentation for how to override the PMPro templates.
  * @link https://www.paidmembershipspro.com/documentation/templates/
  *
- * @version 3.5
+ * @version TBD
  *
  * @author Paid Memberships Pro
  */
@@ -69,7 +69,18 @@ if ( empty( $default_gateway ) ) {
 
 		<form id="pmpro_form" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form' ) ); ?>" action="<?php if(!empty($_REQUEST['review'])) echo esc_url( pmpro_url("checkout", "?pmpro_level=" . $pmpro_level->id ) ); ?>" method="post">
 
-			<input type="hidden" id="pmpro_level" name="pmpro_level" value="<?php echo esc_attr( $pmpro_level->id ) ?>" />
+			<?php
+			if ( empty( $pmpro_review ) ) {
+				?>
+				<input type="hidden" id="pmpro_level" name="pmpro_level" value="<?php echo esc_attr( $pmpro_level->id ) ?>" />
+				<?php
+			} else {
+				?>
+				<input type="hidden" id="pmpro_order" name="pmpro_order" value="<?php echo esc_attr( $pmpro_review->id ) ?>" />
+				<?php
+			}
+			?>
+			
 			<input type="hidden" id="checkjavascript" name="checkjavascript" value="1" />
 			<?php if ($discount_code && $pmpro_review) { ?>
 				<input class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_alter_price', 'pmpro_discount_code' ) ); ?>" id="pmpro_discount_code" name="pmpro_discount_code" type="hidden" value="<?php echo esc_attr($discount_code) ?>" />
@@ -221,260 +232,264 @@ if ( empty( $default_gateway ) ) {
 			do_action( 'pmpro_checkout_after_pricing_fields', $pmpro_level );
 			?>
 
-			<?php
-			// Define whether we should show the Account Information box.
-			$show_pmpro_user_fields_fieldset = true;
+			<?
+			if ( ! $pmpro_review ) {
+				// Define whether we should show the Account Information box.
+				$show_pmpro_user_fields_fieldset = true;
 
-			// If $pmpro_review is set, skip.
-			if ( $pmpro_review ) {
-				$show_pmpro_user_fields_fieldset = false;
-			}
+				// If $pmpro_review is set, skip.
+				if ( $pmpro_review ) {
+					$show_pmpro_user_fields_fieldset = false;
+				}
 
-			// If we are skipping the account fields and the user is logged out, skip the entire fieldset.
-			// The logged out check is important since if the user is logged in, we will show a logged in message.
-			if ( $skip_account_fields && ! $current_user->ID ) {
-				$show_pmpro_user_fields_fieldset = false;
-			}
+				// If we are skipping the account fields and the user is logged out, skip the entire fieldset.
+				// The logged out check is important since if the user is logged in, we will show a logged in message.
+				if ( $skip_account_fields && ! $current_user->ID ) {
+					$show_pmpro_user_fields_fieldset = false;
+				}
 
-			if ( $show_pmpro_user_fields_fieldset ) {
+				if ( $show_pmpro_user_fields_fieldset ) {
+					?>
+					<fieldset id="pmpro_user_fields" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fieldset', 'pmpro_user_fields' ) ); ?>">
+						<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card' ) ); ?>">
+							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card_content' ) ); ?>">
+								<legend class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_legend' ) ); ?>">
+									<h2 class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_heading pmpro_font-large' ) ); ?>"><?php esc_html_e( 'Account Information', 'paid-memberships-pro' ); ?></h2>
+								</legend>
+								<?php if ( ! $skip_account_fields ) { ?>
+									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields' ) ); ?>">
+										<?php
+											// Get discount code from URL parameter, so if the user logs in it will keep it applied.
+											$discount_code_link = ! empty( $discount_code) ? '&pmpro_discount_code=' . $discount_code : '';
+										?>
+
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-username', 'pmpro_form_field-username' ) ); ?>">
+											<label for="username" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Username', 'paid-memberships-pro' );?></label>
+											<input id="username" name="username" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'username' ) ); ?>" autocomplete="username" value="<?php echo esc_attr( $username ); ?>" />
+										</div> <!-- end pmpro_form_field-username -->
+
+										<?php do_action( 'pmpro_checkout_after_username' ); ?>
+
+										<?php
+											/**
+											 * Filter to require confirmed password at checkout.
+											 *
+											 * @param bool $pmpro_checkout_confirm_password, true to require a password confirm field, false to hide.
+											 */
+											$pmpro_checkout_confirm_password = apply_filters( 'pmpro_checkout_confirm_password', true );
+
+											echo $pmpro_checkout_confirm_password ? '<div class="' . esc_attr( pmpro_get_element_class( 'pmpro_cols-2' ) ) . '">' : '';
+										?>
+
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-password' ) ); ?>">
+											<label for="password" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>">
+												<?php esc_html_e( 'Password', 'paid-memberships-pro' );?>
+											</label>
+											<input type="password" name="password" id="password" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-password', 'password' ) ); ?>" autocomplete="new-password" spellcheck="false" value="<?php echo esc_attr( $password ); ?>" />
+											<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field-password-toggle' ) ); ?>">
+												<button type="button" class="pmpro_btn pmpro_btn-plain pmpro_btn-password-toggle hide-if-no-js" data-toggle="0">
+													<span class="pmpro_icon pmpro_icon-eye" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--pmpro--color--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+														<span class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field-password-toggle-state' ) ); ?>"><?php esc_html_e( 'Show Password', 'paid-memberships-pro' ); ?></span>
+												</button>
+											</div> <!-- end pmpro_form_field-password-toggle -->
+										</div> <!-- end pmpro_form_field-password -->
+
+										<?php
+											if ( $pmpro_checkout_confirm_password ) {
+												?>
+												<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-password', 'pmpro_form_field-password2' ) ); ?>">
+													<label for="password2" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Confirm Password', 'paid-memberships-pro' );?></label>
+													<input type="password" name="password2" id="password2" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-password', 'password2' ) ); ?>" autocomplete="new-password" spellcheck="false" value="<?php echo esc_attr( $password2 ); ?>" />
+												</div> <!-- end pmpro_form_field-password2 -->
+												<?php
+											} else {
+												?>
+												<input type="hidden" name="password2_copy" value="1" />
+												<?php
+											}
+										?>
+
+										<?php echo $pmpro_checkout_confirm_password ? '</div>' : ''; ?>
+
+										<?php do_action( 'pmpro_checkout_after_password' ); ?>
+
+										<?php
+											/**
+											 * Filter to require confirmed email at checkout.
+											 *
+											 * @param bool $pmpro_checkout_confirm_email, true to require a email confirm field, false to hide.
+											 */
+											$pmpro_checkout_confirm_email = apply_filters( 'pmpro_checkout_confirm_email', true );
+
+											echo $pmpro_checkout_confirm_email ? '<div class="' . esc_attr( pmpro_get_element_class( 'pmpro_cols-2' ) ) . '">' : '';
+										?>
+
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-email pmpro_form_field-bemail', 'pmpro_form_field-bemail' ) ); ?>">
+											<label for="bemail" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Email Address', 'paid-memberships-pro' );?></label>
+											<input id="bemail" name="bemail" type="<?php echo ( $pmpro_email_field_type ? 'email' : 'text' ); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-email', 'bemail' ) ); ?>" value="<?php echo esc_attr( $bemail ); ?>" />
+										</div> <!-- end pmpro_form_field-bemail -->
+
+										<?php
+											if ( $pmpro_checkout_confirm_email ) {
+												?>
+												<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-email pmpro_form_field-bconfirmemail', 'pmpro_form_field-bconfirmemail' ) ); ?>">
+													<label for="bconfirmemail" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Confirm Email Address', 'paid-memberships-pro' );?></label>
+													<input id="bconfirmemail" name="bconfirmemail" type="<?php echo ( $pmpro_email_field_type ? 'email' : 'text' ); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-email', 'bconfirmemail' ) ); ?>" value="<?php echo esc_attr( $bconfirmemail ); ?>" />
+												</div> <!-- end pmpro_form_field-bconfirmemail -->
+												<?php
+											} else {
+												?>
+												<input type="hidden" name="bconfirmemail_copy" value="1" />
+												<?php
+											}
+										?>
+
+										<?php echo $pmpro_checkout_confirm_email ? '</div>' : ''; ?>
+
+										<?php do_action( 'pmpro_checkout_after_email' ); ?>
+
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_hidden' ) ); ?>">
+											<label for="fullname"><?php esc_html_e('Full Name', 'paid-memberships-pro' );?></label>
+											<input id="fullname" name="fullname" type="text" value="" autocomplete="off" aria-hidden="true" aria-label="<?php esc_html_e( 'Do not fill this field out. Leave this blank.', 'paid-memberships-pro'); ?>"/> <strong><?php esc_html_e('LEAVE THIS BLANK', 'paid-memberships-pro' );?></strong>
+										</div> <!-- end pmpro_hidden -->
+									</div>  <!-- end pmpro_form_fields -->
+								<?php } else { ?>
+									<div id="pmpro_account_loggedin">
+										<?php
+											$allowed_html = array(
+												'a' => array(
+													'href' => array(),
+													'title' => array(),
+													'target' => array(),
+												),
+												'strong' => array(),
+											);
+											echo wp_kses( sprintf( __('You are logged in as <strong>%s</strong>. If you would like to use a different account for this membership, <a href="%s">log out now</a>.', 'paid-memberships-pro' ), $current_user->user_login, wp_logout_url( esc_url_raw( $_SERVER['REQUEST_URI'] ) ) ), $allowed_html );
+										?>
+									</div> <!-- end pmpro_account_loggedin -->
+								<?php } ?>
+							</div> <!-- end pmpro_card_content -->
+							<?php if ( ! $skip_account_fields ) { ?>
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card_actions' ) ); ?>">
+									<?php esc_html_e('Already have an account?', 'paid-memberships-pro' );?> <a href="<?php echo esc_url( wp_login_url( apply_filters( 'pmpro_checkout_login_redirect', pmpro_url("checkout", "?pmpro_level=" . $pmpro_level->id . $discount_code_link) ) ) ); ?>"><?php esc_html_e('Log in here', 'paid-memberships-pro' ); ?></a>
+								</div> <!-- end pmpro_card_actions -->
+							<?php } ?>
+						</div> <!-- end pmpro_card -->
+					</fieldset> <!-- end pmpro_user_fields -->
+				<?php } ?>
+
+				<?php do_action( 'pmpro_checkout_after_user_fields' ); ?>
+
+				<?php
+				/**
+				 * Add additional checkout boxes to the checkout page.
+				 *
+				 * @since 3.4 Added $pmpro_level as a parameter.
+				 *
+				 * @param object $pmpro_level The PMPro Level object being purchased.
+				 */
+				do_action( 'pmpro_checkout_boxes', $pmpro_level );
 				?>
-				<fieldset id="pmpro_user_fields" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fieldset', 'pmpro_user_fields' ) ); ?>">
+
+				<?php
+					$pmpro_include_billing_address_fields = apply_filters('pmpro_include_billing_address_fields', true);
+					if ( $pmpro_include_billing_address_fields ) { ?>
+				<fieldset id="pmpro_billing_address_fields" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fieldset', 'pmpro_billing_address_fields' ) ); ?>" <?php if ( ! $pmpro_requirebilling || apply_filters("pmpro_hide_billing_address_fields", false) ) { ?>style="display: none;"<?php } ?>>
 					<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card' ) ); ?>">
 						<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card_content' ) ); ?>">
 							<legend class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_legend' ) ); ?>">
-								<h2 class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_heading pmpro_font-large' ) ); ?>"><?php esc_html_e( 'Account Information', 'paid-memberships-pro' ); ?></h2>
+								<h2 class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_heading pmpro_font-large' ) ); ?>"><?php esc_html_e( 'Billing Address', 'paid-memberships-pro' ); ?></h2>
 							</legend>
-							<?php if ( ! $skip_account_fields ) { ?>
-								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields' ) ); ?>">
-									<?php
-										// Get discount code from URL parameter, so if the user logs in it will keep it applied.
-										$discount_code_link = ! empty( $discount_code) ? '&pmpro_discount_code=' . $discount_code : '';
-									?>
-
-									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-username', 'pmpro_form_field-username' ) ); ?>">
-										<label for="username" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Username', 'paid-memberships-pro' );?></label>
-										<input id="username" name="username" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'username' ) ); ?>" autocomplete="username" value="<?php echo esc_attr( $username ); ?>" />
-									</div> <!-- end pmpro_form_field-username -->
-
-									<?php do_action( 'pmpro_checkout_after_username' ); ?>
-
-									<?php
-										/**
-										 * Filter to require confirmed password at checkout.
-										 *
-										 * @param bool $pmpro_checkout_confirm_password, true to require a password confirm field, false to hide.
-										 */
-										$pmpro_checkout_confirm_password = apply_filters( 'pmpro_checkout_confirm_password', true );
-
-										echo $pmpro_checkout_confirm_password ? '<div class="' . esc_attr( pmpro_get_element_class( 'pmpro_cols-2' ) ) . '">' : '';
-									?>
-
-									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-password' ) ); ?>">
-										<label for="password" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>">
-											<?php esc_html_e( 'Password', 'paid-memberships-pro' );?>
-										</label>
-										<input type="password" name="password" id="password" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-password', 'password' ) ); ?>" autocomplete="new-password" spellcheck="false" value="<?php echo esc_attr( $password ); ?>" />
-										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field-password-toggle' ) ); ?>">
-											<button type="button" class="pmpro_btn pmpro_btn-plain pmpro_btn-password-toggle hide-if-no-js" data-toggle="0">
-												<span class="pmpro_icon pmpro_icon-eye" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--pmpro--color--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
-													<span class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field-password-toggle-state' ) ); ?>"><?php esc_html_e( 'Show Password', 'paid-memberships-pro' ); ?></span>
-											</button>
-										</div> <!-- end pmpro_form_field-password-toggle -->
-									</div> <!-- end pmpro_form_field-password -->
-
-									<?php
-										if ( $pmpro_checkout_confirm_password ) {
-											?>
-											<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-password', 'pmpro_form_field-password2' ) ); ?>">
-												<label for="password2" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Confirm Password', 'paid-memberships-pro' );?></label>
-												<input type="password" name="password2" id="password2" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-password', 'password2' ) ); ?>" autocomplete="new-password" spellcheck="false" value="<?php echo esc_attr( $password2 ); ?>" />
-											</div> <!-- end pmpro_form_field-password2 -->
+							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields pmpro_cols-2' ) ); ?>">
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bfirstname', 'pmpro_form_field-bfirstname' ) ); ?>">
+									<label for="bfirstname" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('First Name', 'paid-memberships-pro' );?></label>
+									<input id="bfirstname" name="bfirstname" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bfirstname' ) ); ?>" value="<?php echo esc_attr($bfirstname); ?>" autocomplete="given-name" />
+								</div> <!-- end pmpro_form_field-bfirstname -->
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-blastname', 'pmpro_form_field-blastname' ) ); ?>">
+									<label for="blastname" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Last Name', 'paid-memberships-pro' );?></label>
+									<input id="blastname" name="blastname" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'blastname' ) ); ?>" value="<?php echo esc_attr($blastname); ?>" autocomplete="family-name" />
+								</div> <!-- end pmpro_form_field-blastname -->
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-baddress1', 'pmpro_form_field-baddress1' ) ); ?>">
+									<label for="baddress1" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Address 1', 'paid-memberships-pro' );?></label>
+									<input id="baddress1" name="baddress1" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'baddress1' ) ); ?>" value="<?php echo esc_attr($baddress1); ?>" autocomplete="billing street-address" />
+								</div> <!-- end pmpro_form_field-baddress1 -->
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-baddress2', 'pmpro_form_field-baddress2' ) ); ?>">
+									<label for="baddress2" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Address 2', 'paid-memberships-pro' );?></label>
+									<input id="baddress2" name="baddress2" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'baddress2' ) ); ?>" value="<?php echo esc_attr($baddress2); ?>" />
+								</div> <!-- end pmpro_form_field-baddress2 -->
+									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bcity', 'pmpro_form_field-bcity' ) ); ?>">
+										<label for="bcity" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('City', 'paid-memberships-pro' );?></label>
+										<input id="bcity" name="bcity" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bcity' ) ); ?>" value="<?php echo esc_attr($bcity); ?>" />
+									</div> <!-- end pmpro_form_field-bcity -->
+									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bstate', 'pmpro_form_field-bstate' ) ); ?>">
+										<label for="bstate" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('State', 'paid-memberships-pro' );?></label>
+										<input id="bstate" name="bstate" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bstate' ) ); ?>" value="<?php echo esc_attr($bstate); ?>" />
+									</div> <!-- end pmpro_form_field-bstate -->
+									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bzipcode', 'pmpro_form_field-bzipcode' ) ); ?>">
+										<label for="bzipcode" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Postal Code', 'paid-memberships-pro' );?></label>
+										<input id="bzipcode" name="bzipcode" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bzipcode' ) ); ?>" value="<?php echo esc_attr($bzipcode); ?>" autocomplete="billing postal-code" />
+									</div> <!-- end pmpro_form_field-bzipcode -->
+								<?php
+									$show_country = apply_filters("pmpro_international_addresses", true);
+									if($show_country) { ?>
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-select pmpro_form_field-bcountry', 'pmpro_form_field-bcountry' ) ); ?>">
+											<label for="bcountry" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Country', 'paid-memberships-pro' );?></label>
+											<select name="bcountry" id="bcountry" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-select', 'bcountry' ) ); ?>" autocomplete="billing country">
 											<?php
-										} else {
-											?>
-											<input type="hidden" name="password2_copy" value="1" />
-											<?php
+												global $pmpro_countries, $pmpro_default_country;
+												if(!$bcountry) {
+													$bcountry = $pmpro_default_country;
+												}
+												foreach($pmpro_countries as $abbr => $country) { ?>
+													<option value="<?php echo esc_attr( $abbr ) ?>" <?php if($abbr == $bcountry) { ?>selected="selected"<?php } ?>><?php echo esc_html( $country )?></option>
+												<?php } ?>
+											</select>
+										</div> <!-- end pmpro_form_field-bcountry -->
+									<?php } else { ?>
+										<input type="hidden" name="bcountry" id="bcountry" value="<?php echo esc_attr( $pmpro_default_country ); ?>" />
+									<?php } ?>
+								<?php if($skip_account_fields) { ?>
+								<?php
+									if($current_user->ID) {
+										if(!$bemail && $current_user->user_email) {
+											$bemail = $current_user->user_email;
 										}
-									?>
-
-									<?php echo $pmpro_checkout_confirm_password ? '</div>' : ''; ?>
-
-									<?php do_action( 'pmpro_checkout_after_password' ); ?>
-
-									<?php
-										/**
-										 * Filter to require confirmed email at checkout.
-										 *
-										 * @param bool $pmpro_checkout_confirm_email, true to require a email confirm field, false to hide.
-										 */
-										$pmpro_checkout_confirm_email = apply_filters( 'pmpro_checkout_confirm_email', true );
-
-										echo $pmpro_checkout_confirm_email ? '<div class="' . esc_attr( pmpro_get_element_class( 'pmpro_cols-2' ) ) . '">' : '';
-									?>
-
-									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-email pmpro_form_field-bemail', 'pmpro_form_field-bemail' ) ); ?>">
-										<label for="bemail" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Email Address', 'paid-memberships-pro' );?></label>
-										<input id="bemail" name="bemail" type="<?php echo ( $pmpro_email_field_type ? 'email' : 'text' ); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-email', 'bemail' ) ); ?>" value="<?php echo esc_attr( $bemail ); ?>" />
-									</div> <!-- end pmpro_form_field-bemail -->
-
-									<?php
-										if ( $pmpro_checkout_confirm_email ) {
-											?>
-											<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-email pmpro_form_field-bconfirmemail', 'pmpro_form_field-bconfirmemail' ) ); ?>">
-												<label for="bconfirmemail" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Confirm Email Address', 'paid-memberships-pro' );?></label>
-												<input id="bconfirmemail" name="bconfirmemail" type="<?php echo ( $pmpro_email_field_type ? 'email' : 'text' ); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-email', 'bconfirmemail' ) ); ?>" value="<?php echo esc_attr( $bconfirmemail ); ?>" />
-											</div> <!-- end pmpro_form_field-bconfirmemail -->
-											<?php
-										} else {
-											?>
-											<input type="hidden" name="bconfirmemail_copy" value="1" />
-											<?php
+										if(!$bconfirmemail && $current_user->user_email) {
+											$bconfirmemail = $current_user->user_email;
 										}
-									?>
-
-									<?php echo $pmpro_checkout_confirm_email ? '</div>' : ''; ?>
-
-									<?php do_action( 'pmpro_checkout_after_email' ); ?>
-
-									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_hidden' ) ); ?>">
-										<label for="fullname"><?php esc_html_e('Full Name', 'paid-memberships-pro' );?></label>
-										<input id="fullname" name="fullname" type="text" value="" autocomplete="off" aria-hidden="true" aria-label="<?php esc_html_e( 'Do not fill this field out. Leave this blank.', 'paid-memberships-pro'); ?>"/> <strong><?php esc_html_e('LEAVE THIS BLANK', 'paid-memberships-pro' );?></strong>
-									</div> <!-- end pmpro_hidden -->
-								</div>  <!-- end pmpro_form_fields -->
-							<?php } else { ?>
-								<div id="pmpro_account_loggedin">
-									<?php
-										$allowed_html = array(
-											'a' => array(
-												'href' => array(),
-												'title' => array(),
-												'target' => array(),
-											),
-											'strong' => array(),
-										);
-										echo wp_kses( sprintf( __('You are logged in as <strong>%s</strong>. If you would like to use a different account for this membership, <a href="%s">log out now</a>.', 'paid-memberships-pro' ), $current_user->user_login, wp_logout_url( esc_url_raw( $_SERVER['REQUEST_URI'] ) ) ), $allowed_html );
-									?>
-								</div> <!-- end pmpro_account_loggedin -->
-							<?php } ?>
+									}
+								?>
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-email pmpro_form_field-bemail', 'pmpro_form_field-bemail' ) ); ?>">
+									<label for="bemail" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Email Address', 'paid-memberships-pro' );?></label>
+									<input id="bemail" name="bemail" type="<?php echo ($pmpro_email_field_type ? 'email' : 'text'); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-email', 'bemail' ) ); ?>" value="<?php echo esc_attr($bemail); ?>" autocomplete="email" />
+								</div> <!-- end pmpro_form_field-bemail -->
+								<?php
+									$pmpro_checkout_confirm_email = apply_filters("pmpro_checkout_confirm_email", true);
+									if($pmpro_checkout_confirm_email) { ?>
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-email pmpro_form_field-bconfirmemail', 'pmpro_form_field-bconfirmemail' ) ); ?>">
+											<label for="bconfirmemail" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Confirm Email', 'paid-memberships-pro' );?></label>
+											<input id="bconfirmemail" name="bconfirmemail" type="<?php echo ($pmpro_email_field_type ? 'email' : 'text'); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-email', 'bconfirmemail' ) ); ?>" value="<?php echo esc_attr($bconfirmemail); ?>" autocomplete="email" />
+										</div> <!-- end pmpro_form_field-bconfirmemail -->
+									<?php } else { ?>
+										<input type="hidden" name="bconfirmemail_copy" value="1" />
+									<?php } ?>
+								<?php } ?>
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bphone', 'pmpro_form_field-bphone' ) ); ?>">
+									<label for="bphone" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Phone', 'paid-memberships-pro' );?></label>
+									<input id="bphone" name="bphone" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bphone' ) ); ?>" value="<?php echo esc_attr(formatPhone($bphone)); ?>" autocomplete="tel" />
+								</div> <!-- end pmpro_form_field-bphone -->
+							</div> <!-- end pmpro_form_fields -->
 						</div> <!-- end pmpro_card_content -->
-						<?php if ( ! $skip_account_fields ) { ?>
-							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card_actions' ) ); ?>">
-								<?php esc_html_e('Already have an account?', 'paid-memberships-pro' );?> <a href="<?php echo esc_url( wp_login_url( apply_filters( 'pmpro_checkout_login_redirect', pmpro_url("checkout", "?pmpro_level=" . $pmpro_level->id . $discount_code_link) ) ) ); ?>"><?php esc_html_e('Log in here', 'paid-memberships-pro' ); ?></a>
-							</div> <!-- end pmpro_card_actions -->
-						<?php } ?>
 					</div> <!-- end pmpro_card -->
-				</fieldset> <!-- end pmpro_user_fields -->
-			<?php } ?>
+				</fieldset> <!-- end pmpro_billing_address_fields -->
+				<?php } ?>
 
-			<?php do_action( 'pmpro_checkout_after_user_fields' ); ?>
+				<?php do_action( 'pmpro_checkout_after_billing_fields' ); ?>
 
-			<?php
-			/**
-			 * Add additional checkout boxes to the checkout page.
-			 *
-			 * @since 3.4 Added $pmpro_level as a parameter.
-			 *
-			 * @param object $pmpro_level The PMPro Level object being purchased.
-			 */
-			do_action( 'pmpro_checkout_boxes', $pmpro_level );
-			?>
+				<?php
+			} // if ( ! $pmpro_review )
 
-			<?php
-				$pmpro_include_billing_address_fields = apply_filters('pmpro_include_billing_address_fields', true);
-				if ( $pmpro_include_billing_address_fields ) { ?>
-			<fieldset id="pmpro_billing_address_fields" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fieldset', 'pmpro_billing_address_fields' ) ); ?>" <?php if ( ! $pmpro_requirebilling || apply_filters("pmpro_hide_billing_address_fields", false) ) { ?>style="display: none;"<?php } ?>>
-				<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card' ) ); ?>">
-					<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card_content' ) ); ?>">
-						<legend class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_legend' ) ); ?>">
-							<h2 class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_heading pmpro_font-large' ) ); ?>"><?php esc_html_e( 'Billing Address', 'paid-memberships-pro' ); ?></h2>
-						</legend>
-						<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields pmpro_cols-2' ) ); ?>">
-							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bfirstname', 'pmpro_form_field-bfirstname' ) ); ?>">
-								<label for="bfirstname" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('First Name', 'paid-memberships-pro' );?></label>
-								<input id="bfirstname" name="bfirstname" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bfirstname' ) ); ?>" value="<?php echo esc_attr($bfirstname); ?>" autocomplete="given-name" />
-							</div> <!-- end pmpro_form_field-bfirstname -->
-							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-blastname', 'pmpro_form_field-blastname' ) ); ?>">
-								<label for="blastname" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Last Name', 'paid-memberships-pro' );?></label>
-								<input id="blastname" name="blastname" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'blastname' ) ); ?>" value="<?php echo esc_attr($blastname); ?>" autocomplete="family-name" />
-							</div> <!-- end pmpro_form_field-blastname -->
-							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-baddress1', 'pmpro_form_field-baddress1' ) ); ?>">
-								<label for="baddress1" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Address 1', 'paid-memberships-pro' );?></label>
-								<input id="baddress1" name="baddress1" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'baddress1' ) ); ?>" value="<?php echo esc_attr($baddress1); ?>" autocomplete="billing street-address" />
-							</div> <!-- end pmpro_form_field-baddress1 -->
-							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-baddress2', 'pmpro_form_field-baddress2' ) ); ?>">
-								<label for="baddress2" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Address 2', 'paid-memberships-pro' );?></label>
-								<input id="baddress2" name="baddress2" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'baddress2' ) ); ?>" value="<?php echo esc_attr($baddress2); ?>" />
-							</div> <!-- end pmpro_form_field-baddress2 -->
-								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bcity', 'pmpro_form_field-bcity' ) ); ?>">
-									<label for="bcity" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('City', 'paid-memberships-pro' );?></label>
-									<input id="bcity" name="bcity" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bcity' ) ); ?>" value="<?php echo esc_attr($bcity); ?>" />
-								</div> <!-- end pmpro_form_field-bcity -->
-								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bstate', 'pmpro_form_field-bstate' ) ); ?>">
-									<label for="bstate" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('State', 'paid-memberships-pro' );?></label>
-									<input id="bstate" name="bstate" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bstate' ) ); ?>" value="<?php echo esc_attr($bstate); ?>" />
-								</div> <!-- end pmpro_form_field-bstate -->
-								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bzipcode', 'pmpro_form_field-bzipcode' ) ); ?>">
-									<label for="bzipcode" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Postal Code', 'paid-memberships-pro' );?></label>
-									<input id="bzipcode" name="bzipcode" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bzipcode' ) ); ?>" value="<?php echo esc_attr($bzipcode); ?>" autocomplete="billing postal-code" />
-								</div> <!-- end pmpro_form_field-bzipcode -->
-							<?php
-								$show_country = apply_filters("pmpro_international_addresses", true);
-								if($show_country) { ?>
-									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-select pmpro_form_field-bcountry', 'pmpro_form_field-bcountry' ) ); ?>">
-										<label for="bcountry" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Country', 'paid-memberships-pro' );?></label>
-										<select name="bcountry" id="bcountry" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-select', 'bcountry' ) ); ?>" autocomplete="billing country">
-										<?php
-											global $pmpro_countries, $pmpro_default_country;
-											if(!$bcountry) {
-												$bcountry = $pmpro_default_country;
-											}
-											foreach($pmpro_countries as $abbr => $country) { ?>
-												<option value="<?php echo esc_attr( $abbr ) ?>" <?php if($abbr == $bcountry) { ?>selected="selected"<?php } ?>><?php echo esc_html( $country )?></option>
-											<?php } ?>
-										</select>
-									</div> <!-- end pmpro_form_field-bcountry -->
-								<?php } else { ?>
-									<input type="hidden" name="bcountry" id="bcountry" value="<?php echo esc_attr( $pmpro_default_country ); ?>" />
-								<?php } ?>
-							<?php if($skip_account_fields) { ?>
-							<?php
-								if($current_user->ID) {
-									if(!$bemail && $current_user->user_email) {
-										$bemail = $current_user->user_email;
-									}
-									if(!$bconfirmemail && $current_user->user_email) {
-										$bconfirmemail = $current_user->user_email;
-									}
-								}
-							?>
-							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-email pmpro_form_field-bemail', 'pmpro_form_field-bemail' ) ); ?>">
-								<label for="bemail" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Email Address', 'paid-memberships-pro' );?></label>
-								<input id="bemail" name="bemail" type="<?php echo ($pmpro_email_field_type ? 'email' : 'text'); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-email', 'bemail' ) ); ?>" value="<?php echo esc_attr($bemail); ?>" autocomplete="email" />
-							</div> <!-- end pmpro_form_field-bemail -->
-							<?php
-								$pmpro_checkout_confirm_email = apply_filters("pmpro_checkout_confirm_email", true);
-								if($pmpro_checkout_confirm_email) { ?>
-									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-email pmpro_form_field-bconfirmemail', 'pmpro_form_field-bconfirmemail' ) ); ?>">
-										<label for="bconfirmemail" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Confirm Email', 'paid-memberships-pro' );?></label>
-										<input id="bconfirmemail" name="bconfirmemail" type="<?php echo ($pmpro_email_field_type ? 'email' : 'text'); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-email', 'bconfirmemail' ) ); ?>" value="<?php echo esc_attr($bconfirmemail); ?>" autocomplete="email" />
-									</div> <!-- end pmpro_form_field-bconfirmemail -->
-								<?php } else { ?>
-									<input type="hidden" name="bconfirmemail_copy" value="1" />
-								<?php } ?>
-							<?php } ?>
-							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_form_field-bphone', 'pmpro_form_field-bphone' ) ); ?>">
-								<label for="bphone" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Phone', 'paid-memberships-pro' );?></label>
-								<input id="bphone" name="bphone" type="text" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'bphone' ) ); ?>" value="<?php echo esc_attr(formatPhone($bphone)); ?>" autocomplete="tel" />
-							</div> <!-- end pmpro_form_field-bphone -->
-						</div> <!-- end pmpro_form_fields -->
-					</div> <!-- end pmpro_card_content -->
-				</div> <!-- end pmpro_card -->
-			</fieldset> <!-- end pmpro_billing_address_fields -->
-			<?php } ?>
-
-			<?php do_action( 'pmpro_checkout_after_billing_fields' ); ?>
-
-			<?php
+			if ( $pmpro_review || empty( get_option( 'pmpro_separate_payment_step' ) ) ) {
 				/**
 				 * Filter to set if the payment information fields should be shown.
 				 *
@@ -554,17 +569,18 @@ if ( empty( $default_gateway ) ) {
 					</fieldset> <!-- end pmpro_payment_information_fields -->
 					<?php
 				}
-			?>
+				?>
 
-			<?php
-			/**
-			 * Fires after the payment information fields on the checkout page.
-			 *
-			 * @since 3.4 Added $pmpro_level as a parameter.
-			 *
-			 * @param object $pmpro_level The PMPro Level object being purchased.
-			 */
-      		do_action( 'pmpro_checkout_after_payment_information_fields', $pmpro_level );
+				<?php
+				/**
+				 * Fires after the payment information fields on the checkout page.
+				 *
+				 * @since 3.4 Added $pmpro_level as a parameter.
+				 *
+				 * @param object $pmpro_level The PMPro Level object being purchased.
+				 */
+				do_action( 'pmpro_checkout_after_payment_information_fields', $pmpro_level );
+			} // if ( $pmpro_review || empty( get_option( 'pmpro_separate_payment_step' ) ) )
 
 			/**
 			 * Fires before the submit button on the checkout page.

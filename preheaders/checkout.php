@@ -24,6 +24,7 @@ if ( ! empty( $_REQUEST['pmpro_order'] ) ) {
 		// We are reworking this variable to maintain backwards compatiblity with custom page templates and
 		// setting it whenever a token order is passed in the URL and requires addtional payment steps.
 		$pmpro_review = $order_obj;
+		$review_order_passed = true;
 
 		// If the order is not for the current user or the order is in error status, redirect to the account page.
 		if ( $current_user->ID != $pmpro_review->user_id || 'error' === $pmpro_review->status ) {
@@ -296,12 +297,15 @@ $pmpro_required_billing_fields = array(
 	"bphone"          => $bphone,
 	"bemail"          => $bemail,
 	"bcountry"        => $bcountry,
-	"CardType"        => $CardType,
-	"AccountNumber"   => $AccountNumber,
-	"ExpirationMonth" => $ExpirationMonth,
-	"ExpirationYear"  => $ExpirationYear,
-	"CVV"             => $CVV
 );
+// If this is the payment step, add payment fields.
+if ( ! empty( $pmpro_review) || empty( get_option( 'pmpro_separate_payment_step' ) ) ) {
+	$pmpro_required_billing_fields["CardType"] = $CardType;
+	$pmpro_required_billing_fields["AccountNumber"] = $AccountNumber;
+	$pmpro_required_billing_fields["ExpirationMonth"] = $ExpirationMonth;
+	$pmpro_required_billing_fields["ExpirationYear"] = $ExpirationYear;
+	$pmpro_required_billing_fields["CVV"] = $CVV;
+}
 $pmpro_required_billing_fields = apply_filters( "pmpro_required_billing_fields", $pmpro_required_billing_fields );
 $pmpro_required_user_fields    = array(
 	"username"      => $username,
@@ -557,7 +561,7 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 	}
 
 	// If there is still a valid checkout submission, give custom code the chance to halt checkout.
-	if ( $pmpro_msgt != "pmpro_error" ) {
+	if ( $pmpro_msgt != "pmpro_error" && empty( $pmpro_review ) ) {
 		/**
 		 * Filter whether this checkout should proceed to the order creation step.
 		 *
@@ -574,7 +578,7 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 	}
 
 	// If there is still a valid checkout submission, create the order.
-	if ( $pmpro_msgt != "pmpro_error" ) {
+	if ( $pmpro_msgt != "pmpro_error" && empty( $pmpro_review ) ) {
 		$pmpro_review                   = new MemberOrder();
 		$pmpro_review->user_id          = $current_user->ID;
 		$pmpro_review->membership_id    = $pmpro_level->id;
@@ -621,6 +625,12 @@ if ( $submit && $pmpro_msgt != "pmpro_error" && ! empty( $pmpro_review ) ) {
 		$pmpro_msg       = __( "Payment accepted.", 'paid-memberships-pro' );
 		$pmpro_msgt      = "pmpro_success";
 		$pmpro_confirmed = true;
+	} elseif ( empty( $review_order_passed ) && ! empty( get_option( 'pmpro_separate_payment_step' ) ) ) {
+		// This is multistep checkout and the main checkout page was just submitted.
+		// Save the order in token status so that we can continue to payment.
+		$pmpro_review->status = 'token';
+		$pmpro_review->saveOrder();
+		pmpro_save_checkout_data_to_order( $pmpro_review );
 	} else {
 		/**
 		 * Allow running code when processing fails.
