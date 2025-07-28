@@ -1635,6 +1635,8 @@
 		 */
 		function process()
 		{
+			// Make sure we have a checkout level.
+			$this->getMembershipLevelAtCheckout();
 			if (is_object($this->Gateway)) {
 				return $this->Gateway->process($this);
 			}
