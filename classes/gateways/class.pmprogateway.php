@@ -343,4 +343,113 @@
 		public static function get_description_for_gateway_settings() {
 			return esc_html__( '&#8212;', 'paid-memberships-pro' );
 		}
+
+		/**
+		 * Show the payment fields for this gateway.
+		 *
+		 * @since TBD
+		 */
+		public static function show_payment_fields() {
+			if ( 'PMProGateway' === get_called_class() ) {
+				// This is the base gateway class. Run the default behavior.
+				/**
+				 * Filter to set if the payment information fields should be shown.
+				 *
+				 * @param bool $include_payment_information_fields
+				 * @return bool
+				 */
+				$pmpro_include_payment_information_fields = apply_filters( 'pmpro_include_payment_information_fields', true );
+			} else {
+				// This is a specific gateway class. Run the code specific to that gateway.
+				global $wp_filter;
+				$pmpro_include_payment_information_fields = true;
+				if ( ! empty( $wp_filter['pmpro_include_payment_information_fields']->callbacks ) ) {
+					// Loop through all the filters for pmpro_include_payment_information_fields and see if any are for this gateway.
+					foreach( $wp_filter['pmpro_include_payment_information_fields']->callbacks as $priority => $filters ) {
+						foreach ( $filters as $filter ) {
+							if ( is_array( $filter['function'] ) && get_called_class() == $filter['function'][0] ) {
+								// This gateway has hooked into pmpro_include_payment_information_fields. Use that method instead.
+								$pmpro_include_payment_information_fields = call_user_func( $filter['function'], $pmpro_include_payment_information_fields );
+							}
+						}
+					}
+				}
+			}
+
+			// If the payment information fields should be included, show them.
+			// Sometimes they will be echoed before this when processing the pmpro_include_payment_information_fields filter.
+			if ( $pmpro_include_payment_information_fields ) {
+				global $pmpro_requirebilling, $pmpro_show_discount_code, $discount_code, $CardType, $AccountNumber, $ExpirationMonth,$ExpirationYear;
+				?>
+				<fieldset id="pmpro_payment_information_fields" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fieldset', 'pmpro_payment_information_fields' ) ); ?>" <?php if ( ! $pmpro_requirebilling || apply_filters( 'pmpro_hide_payment_information_fields', false ) ) { ?>style="display: none;"<?php } ?>>
+					<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card' ) ); ?>">
+						<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card_content' ) ); ?>">
+							<legend class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_legend' ) ); ?>">
+								<h2 class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_heading pmpro_font-large' ) ); ?>"><?php esc_html_e( 'Payment Information', 'paid-memberships-pro' ); ?></h2>
+							</legend>
+							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields' ) ); ?>">
+								<input type="hidden" id="CardType" name="CardType" value="<?php echo esc_attr($CardType);?>" />
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_payment-account-number', 'pmpro_payment-account-number' ) ); ?>">
+									<label for="AccountNumber" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Card Number', 'paid-memberships-pro' );?></label>
+									<input id="AccountNumber" name="AccountNumber" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'AccountNumber' ) ); ?>" type="text" value="<?php echo esc_attr($AccountNumber); ?>" data-encrypted-name="number" autocomplete="off" />
+								</div>
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_cols-2' ) ); ?>">
+									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-select pmpro_payment-expiration', 'pmpro_payment-expiration' ) ); ?>">
+										<label for="ExpirationMonth" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Expiration Date', 'paid-memberships-pro' );?></label>
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields-inline' ) ); ?>">
+											<select id="ExpirationMonth" name="ExpirationMonth" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-select', 'ExpirationMonth' ) ); ?>">
+												<option value="01" <?php if($ExpirationMonth == "01") { ?>selected="selected"<?php } ?>>01</option>
+												<option value="02" <?php if($ExpirationMonth == "02") { ?>selected="selected"<?php } ?>>02</option>
+												<option value="03" <?php if($ExpirationMonth == "03") { ?>selected="selected"<?php } ?>>03</option>
+												<option value="04" <?php if($ExpirationMonth == "04") { ?>selected="selected"<?php } ?>>04</option>
+												<option value="05" <?php if($ExpirationMonth == "05") { ?>selected="selected"<?php } ?>>05</option>
+												<option value="06" <?php if($ExpirationMonth == "06") { ?>selected="selected"<?php } ?>>06</option>
+												<option value="07" <?php if($ExpirationMonth == "07") { ?>selected="selected"<?php } ?>>07</option>
+												<option value="08" <?php if($ExpirationMonth == "08") { ?>selected="selected"<?php } ?>>08</option>
+												<option value="09" <?php if($ExpirationMonth == "09") { ?>selected="selected"<?php } ?>>09</option>
+												<option value="10" <?php if($ExpirationMonth == "10") { ?>selected="selected"<?php } ?>>10</option>
+												<option value="11" <?php if($ExpirationMonth == "11") { ?>selected="selected"<?php } ?>>11</option>
+												<option value="12" <?php if($ExpirationMonth == "12") { ?>selected="selected"<?php } ?>>12</option>
+											</select>/<select id="ExpirationYear" name="ExpirationYear" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-select', 'ExpirationYear' ) ); ?>">
+											<?php
+												$num_years = apply_filters( 'pmpro_num_expiration_years', 10 );
+
+												for ( $i = date_i18n( 'Y' ); $i < intval( date_i18n( 'Y' ) ) + intval( $num_years ); $i++ )
+												{
+													?>
+													<option value="<?php echo esc_attr( $i ) ?>" <?php if($ExpirationYear == $i) { ?>selected="selected"<?php } elseif($i == date_i18n( 'Y' ) + 1) { ?>selected="selected"<?php } ?>><?php echo esc_html( $i )?></option>
+													<?php
+												}
+											?>
+											</select>
+										</div> <!-- end pmpro_form_fields-inline -->
+									</div>
+									<?php
+										$pmpro_show_cvv = apply_filters("pmpro_show_cvv", true);
+										if($pmpro_show_cvv) { ?>
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_payment-cvv', 'pmpro_payment-cvv' ) ); ?>">
+											<label for="CVV" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Security Code (CVC)', 'paid-memberships-pro' );?></label>
+											<input id="CVV" name="CVV" type="text" size="4" value="<?php if(!empty($_REQUEST['CVV'])) { echo esc_attr( sanitize_text_field( $_REQUEST['CVV'] ) ); }?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text', 'CVV' ) ); ?>" />
+										</div>
+									<?php } ?>
+								</div> <!-- end pmpro_cols-2 -->
+								<?php if($pmpro_show_discount_code) { ?>
+									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_cols-2' ) ); ?>">
+										<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-text pmpro_payment-discount-code', 'pmpro_payment-discount-code' ) ); ?>">
+											<label for="pmpro_discount_code" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Discount Code', 'paid-memberships-pro' );?></label>
+											<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields-inline' ) ); ?>">
+												<input class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-text pmpro_alter_price', 'discount_code' ) ); ?>" id="pmpro_discount_code" name="pmpro_discount_code" type="text" size="10" value="<?php echo esc_attr($discount_code); ?>" />
+												<input aria-label="<?php esc_html_e( 'Apply discount code', 'paid-memberships-pro' ); ?>" type="button" id="discount_code_button" name="discount_code_button" value="<?php esc_attr_e('Apply', 'paid-memberships-pro' );?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_btn pmpro_btn-submit-discount-code', 'other_discount_code_button' ) ); ?>" />
+											</div> <!-- end pmpro_form_fields-inline -->
+											<div id="discount_code_message" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_message', 'discount_code_message' ) ); ?>" style="display: none;"></div>
+										</div>
+									</div> <!-- end pmpro_cols-2 -->
+								<?php } ?>
+							</div> <!-- end pmpro_form_fields -->
+						</div> <!-- end pmpro_card_content -->
+					</div> <!-- end pmpro_card -->
+				</fieldset> <!-- end pmpro_payment_information_fields -->
+				<?php
+			}
+		}
 	}
