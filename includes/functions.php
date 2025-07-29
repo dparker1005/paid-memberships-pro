@@ -3667,6 +3667,7 @@ function pmpro_filter_price_for_text_field( $price ) {
 
 /**
  * What gateway should we be using?
+ * This function takes into account the context of the request.
  *
  * @since 1.8
  */
@@ -3674,25 +3675,76 @@ function pmpro_getGateway() {
 	// grab from param or options
 	if ( ! empty( $_REQUEST['gateway'] ) ) {
 		$gateway = sanitize_text_field( $_REQUEST['gateway'] );        // gateway passed as param
-	} elseif ( ! empty( $_REQUEST['review'] ) ) {
-		$gateway = 'paypalexpress';             // if review param assume paypalexpress
+	} elseif ( ! empty( $_REQUEST[ 'pmpro_order' ] ) ) {
+		// We have a checkout order. Use that.
+		// Checking this after the gateway param in case we just completed the "choose gateway" step.
+		$order = MemberOrder::get_order( intval( $_REQUEST['pmpro_order'] ) );
+		if ( ! empty( $order->gateway ) ) {
+			$gateway = $order->gateway; // gateway from order
+		}
 	} else {
-		$gateway = get_option( 'pmpro_gateway' );  // get from options
+		$gateway = pmpro_get_enabled_gateway(); // Fall back to choosing a gateway from the enabled gateways.
 	}
 
-	// set valid gateways - the active gateway in the settings and any gateway added through the filter will be allowed
-	$valid_gateways = apply_filters( 'pmpro_valid_gateways', array( get_option( 'pmpro_gateway' ) ) );
+	// Get the list of all enabled gateways.
+	$enabled_gateways = pmpro_get_enabled_gateways();
 
-	// make sure it's valid
-	if ( ! in_array( $gateway, $valid_gateways ) ) {
+	// Make sure the detected gateway is enabled.
+	if ( ! in_array( $gateway, $enabled_gateways ) ) {
 		$gateway = false;
 	}
 
 	// filter for good measure
-	$gateway = apply_filters( 'pmpro_get_gateway', $gateway, $valid_gateways );
+	$gateway = apply_filters_deprecated( 'pmpro_get_gateway', array( $gateway, $enabled_gateways ), 'TBD' );
 
 	return $gateway;
 }
+
+/**
+ * Get the list of enabled gateways.
+ *
+ * @since TBD
+ *
+ * @return array List of enabled gateways.
+ */
+function pmpro_get_enabled_gateways() {
+	$enabled_gateways = get_option( 'pmpro_enabled_gateways', array() );
+
+	/**
+	 * Legacy filter for adding valid gateways.
+	 *
+	 * @param array $enabled_gateways List of enabled gateways.
+	 */
+	$enabled_gateways = apply_filters( 'pmpro_valid_gateways', $enabled_gateways );
+	return $enabled_gateways;
+}
+
+/**
+ * Filter the get_option call for pmpro_gateway to pull data from the new pmpro_enabled_gateways option.
+ * This is typically for backwards compatibility. Use pmpro_get_enabled_gateways() instead.
+ *
+ * @since TBD
+ *
+ * @return string|false The first enabled gateway or false if none are enabled.
+ */
+function pmpro_get_enabled_gateway() {
+	// Unhook the filter to avoid infinite loops.
+	remove_filter( 'option_pmpro_gateway', 'pmpro_get_enabled_gateway' );
+	remove_filter( 'default_option_pmpro_gateway', 'pmpro_get_enabled_gateway' );
+
+	// Get the enabled gateways.
+	$enabled_gateways = pmpro_get_enabled_gateways();
+
+	// Rehook the filter.
+	add_filter( 'option_pmpro_gateway', 'pmpro_get_enabled_gateway' );
+	add_filter( 'default_option_pmpro_gateway', 'pmpro_get_enabled_gateway' );
+
+	// Return the first enabled gateway or false if none are enabled.
+	return ! empty( $enabled_gateways ) ? reset( $enabled_gateways ) : false;
+}
+add_filter( 'option_pmpro_gateway', 'pmpro_get_enabled_gateway' );
+add_filter( 'default_option_pmpro_gateway', 'pmpro_get_enabled_gateway' );
+
 
 /**
  * Does the date provided fall in this month.

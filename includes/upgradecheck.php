@@ -420,6 +420,15 @@ function pmpro_checkForUpgrades() {
 		update_option( 'pmpro_db_version', '3.53' );
 	}
 
+	if ( $pmpro_db_version < 3.6 ) {
+		// Migrate pmpro_gateway option to pmpro_enabled_gateways.
+		$gateway = get_option( 'pmpro_gateway' );
+		if ( ! empty( $gateway ) ) {
+			update_option( 'pmpro_enabled_gateways', array( $gateway ) );
+		}
+		update_option( 'pmpro_db_version', '3.6' );
+	}
+
 }
 
 function pmpro_db_delta() {
