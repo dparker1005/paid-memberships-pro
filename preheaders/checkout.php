@@ -563,10 +563,6 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 		$pmpro_review                   = new MemberOrder();
 		$pmpro_review->user_id          = $current_user->ID;
 		$pmpro_review->membership_id    = $pmpro_level->id;
-		$pmpro_review->cardtype         = $CardType;
-		$pmpro_review->accountnumber    = $AccountNumber;
-		$pmpro_review->expirationmonth  = $ExpirationMonth;
-		$pmpro_review->expirationyear   = $ExpirationYear;
 		$pmpro_review->billing          = new stdClass();
 		$pmpro_review->billing->name    = $bfirstname . " " . $blastname;
 		$pmpro_review->billing->street  = trim( $baddress1 );
@@ -632,6 +628,10 @@ if ( $submit && $pmpro_msgt != "pmpro_error" && ! empty( $pmpro_review ) && ! em
 	do_action( 'pmpro_checkout_before_processing' );
 
 	// Process the payment.
+	$pmpro_review->cardtype         = $CardType;
+	$pmpro_review->accountnumber    = $AccountNumber;
+	$pmpro_review->expirationmonth  = $ExpirationMonth;
+	$pmpro_review->expirationyear   = $ExpirationYear;
 	$pmpro_processed = $pmpro_review->process();
 	if ( ! empty( $pmpro_processed ) ) {
 		$pmpro_msg       = __( "Payment accepted.", 'paid-memberships-pro' );
