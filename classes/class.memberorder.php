@@ -268,10 +268,6 @@
 		 */
 		function __construct($id = NULL)
 		{
-
-			//set up the gateway
-			$this->setGateway(get_option("pmpro_gateway"));
-
 			//set up the billing address structure
 			$this->billing = new stdClass();
 			$this->billing->name = '';
@@ -772,7 +768,6 @@
 			//defaults
 			$this->code = $this->getRandomCode();
 			$this->status = "success";
-			$this->gateway = get_option("pmpro_gateway");
 			$this->gateway_environment = get_option("pmpro_gateway_environment");
 
 			return $this;

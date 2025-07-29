@@ -41,7 +41,7 @@
 		} else {
 			// Save the global settings.
 			$global_settings = array(
-				'gateway',
+				'enabled_gateways',
 				'gateway_environment',
 				'currency',
 				'tax_state',
@@ -94,6 +94,7 @@
 
 	// Get a list of all gateways with human readable names.
 	$pmpro_gateways = pmpro_gateways();
+	$enabled_gateways = pmpro_get_enabled_gateways();
 	$deprecated_gateways = pmpro_get_deprecated_gateways();
 
 	require_once(dirname(__FILE__) . "/admin_header.php");
@@ -119,18 +120,15 @@
 						<tbody>
 							<tr>
 								<th scope="row" valign="top">
-									<label for="gateway"><?php esc_html_e( 'Payment Gateway', 'paid-memberships-pro' );?></label>
+									<label for="enabled_gateways"><?php esc_html_e( 'Enabled Gateways', 'paid-memberships-pro' );?></label>
 								</th>
 								<td>
-									<select id="gateway" name="gateway">
-										<?php
-											foreach ( $pmpro_gateways as $gateway_slug => $gateway_name ) {
-												?>
-												<option value="<?php echo esc_attr( $gateway_slug );?>" <?php selected( pmpro_getOption( 'gateway' ), $gateway_slug ); ?>><?php echo esc_html( $gateway_name );?></option>
-												<?php
-											}
-										?>
-									</select>
+									<?php
+									foreach( $pmpro_gateways as $gateway_slug => $gateway_name ) {
+										$checked = ( ! empty( $enabled_gateways ) && in_array( $gateway_slug, $enabled_gateways, true ) ) ? 'checked="checked"' : '';
+										echo '<label><input type="checkbox" name="enabled_gateways[]" value="' . esc_attr( $gateway_slug ) . '" ' . esc_html( $checked ) . ' /> ' . esc_html( $gateway_name ) . '</label><br />';
+									}
+									?>
 									<p class="description"><?php esc_html_e( 'Select the primary payment gateway for membership checkouts on this site. Before switching, ensure the selected gateway is fully configured for the chosen environment (live or test).', 'paid-memberships-pro' ); ?></p>
 								</td>
 							</tr>
@@ -211,7 +209,7 @@
 									</td>
 									<td class="column-status">
 										<?php
-											$gateway_status_html = pmpro_getOption( 'gateway' ) === $gateway_slug ? '<span class="pmpro_tag pmpro_tag-has_icon pmpro_tag-info">' . esc_html__( 'Enabled (Primary Gateway)', 'paid-memberships-pro' ) . '</span>' : esc_html__( '&#8212;', 'paid-memberships-pro' );
+											$gateway_status_html = in_array( $gateway_slug, $enabled_gateways, true ) ? '<span class="pmpro_tag pmpro_tag-has_icon pmpro_tag-info">' . esc_html__( 'Enabled (Primary Gateway)', 'paid-memberships-pro' ) . '</span>' : esc_html__( '&#8212;', 'paid-memberships-pro' );
 
 											// Special Cases for Add Ons that add secondary gateways. These will be removed when core natively supports multiple gateways.
 											if (
@@ -219,7 +217,7 @@
 												( defined( 'PMPROPBC_VER' ) && $gateway_slug === 'check' ) // Pay by Check Add On.
 											) {
 												// The Add On is active for the gateway being shown.
-												if ( pmpro_getOption( 'gateway' ) === $gateway_slug ) {
+												if ( in_array( $gateway_slug, $enabled_gateways, true ) ) {
 													// If this is the primary gateway, add an alert.
 													$gateway_status_html = '<span class="pmpro_tag pmpro_tag-has_icon pmpro_tag-info">' . esc_html__( 'Enabled (Primary Gateway & via Add On)', 'paid-memberships-pro' ) . '</span>';
 												} else {

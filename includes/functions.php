@@ -3690,7 +3690,7 @@ function pmpro_getGateway() {
 	$enabled_gateways = pmpro_get_enabled_gateways();
 
 	// Make sure the detected gateway is enabled.
-	if ( ! in_array( $gateway, $enabled_gateways ) ) {
+	if ( empty( $gateway ) || ! in_array( $gateway, $enabled_gateways ) ) {
 		$gateway = false;
 	}
 
@@ -3709,6 +3709,11 @@ function pmpro_getGateway() {
  */
 function pmpro_get_enabled_gateways() {
 	$enabled_gateways = get_option( 'pmpro_enabled_gateways', array() );
+
+	// If this is a string, convert it to an array.
+	if ( is_string( $enabled_gateways ) ) {
+		$enabled_gateways = explode( ',', $enabled_gateways );
+	}
 
 	/**
 	 * Legacy filter for adding valid gateways.
@@ -4078,6 +4083,11 @@ function pmpro_show_discount_code() {
 	}
 
 	$show = apply_filters( "pmpro_show_discount_code", $show );
+
+	// If we already have a review order, never show the discount code.
+	if ( ! empty( $_REQUEST['pmpro_order'] ) ) {
+		$show = false;
+	}
 
 	return $show;
 }

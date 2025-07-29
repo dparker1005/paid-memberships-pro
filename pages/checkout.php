@@ -94,10 +94,6 @@ if ( empty( $default_gateway ) ) {
 				<div id="pmpro_message" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_message' ) ); ?>" style="display: none;"></div>
 			<?php } ?>
 
-			<?php if ( $pmpro_review ) { ?>
-				<p><?php echo wp_kses( __( 'Almost done. Review the membership information and pricing below then <strong>click the "Complete Payment" button</strong> to finish your order.', 'paid-memberships-pro' ), array( 'strong' => array() ) ); ?></p>
-			<?php } ?>
-
 			<?php
 				$include_pricing_fields = apply_filters( 'pmpro_include_pricing_fields', true );
 				if ( $include_pricing_fields ) {
@@ -489,7 +485,48 @@ if ( empty( $default_gateway ) ) {
 				<?php
 			} // if ( ! $pmpro_review )
 
-			if ( $pmpro_review || empty( get_option( 'pmpro_separate_payment_step' ) ) ) {
+			// Show "choose a gateway" step if we have a review order without a gateway.
+			if ( $pmpro_review && empty( $pmpro_review->gateway ) ) {
+				?>
+				<fieldset id="pmpro_choose_gateway" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fieldset', 'pmpro_choose_gateway' ) ); ?>">
+					<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card' ) ); ?>">
+						<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card_content' ) ); ?>">
+							<legend class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_legend' ) ); ?>">
+								<h2 class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_heading pmpro_font-large' ) ); ?>"><?php esc_html_e( 'Choose a Payment Method', 'paid-memberships-pro' ); ?></h2>
+							</legend>
+							<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields' ) ); ?>">
+								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-radio' ) ); ?>">
+									<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field-radio-items' ) ); ?>">
+										<?php
+										// Get the gateways.
+										$enabled_gateways = pmpro_get_enabled_gateways();
+										if ( ! empty( $enabled_gateways ) ) {
+											?>
+											<label for="gateway" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label' ) ); ?>"><?php esc_html_e('Payment Method', 'paid-memberships-pro' );?></label>
+											<?php
+											foreach( $enabled_gateways as $gateway ) {
+												?>
+												<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_field pmpro_form_field-radio-item' ) ); ?> gateway_<?php echo esc_attr($gateway); ?>">
+													<input type="radio" id="gateway_<?php echo esc_attr( $gateway ); ?>" name="gateway" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_input pmpro_form_input-radio' ) ); ?>" value="<?php echo esc_attr( $gateway ); ?>" <?php checked( $gateway, $pmpro_review->gateway ); ?> />
+													<label for="gateway_<?php echo esc_attr( $gateway ); ?>" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_label pmpro_form_label-inline pmpro_clickable' ) ); ?>">
+														<?php echo esc_html( $gateway ); ?>
+													</label>
+												</div>
+												<?php
+											}
+										}
+										?>
+									</div> <!-- end pmpro_form_field-radio-items -->
+								</div> <!-- end pmpro_form_field-radio -->
+							</div> <!-- end pmpro_form_fields -->
+						</div> <!-- end pmpro_card_content -->
+					</div> <!-- end pmpro_card -->
+				</fieldset> <!-- end pmpro_choose_gateway -->
+				<?php
+			}
+
+
+			if ( ( $pmpro_review && ! empty( $pmpro_review->gateway ) ) || empty( get_option( 'pmpro_separate_payment_step' ) ) ) {
 				if ( $pmpro_review ) {
 					// Get the gateway for this order.
 					$gateway_obj = $pmpro_review->setGateway();
@@ -532,14 +569,19 @@ if ( empty( $default_gateway ) ) {
 
 			<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_submit' ) ); ?>">
 
-				<?php if ( $pmpro_review ) { ?>
+				<?php if ( $pmpro_review && empty( $pmpro_review->gateway ) ) { ?>
 					<span id="pmpro_submit_span">
-						<input type="hidden" name="confirm" value="1" />
-						<input type="hidden" name="token" value="<?php echo esc_attr($pmpro_paypal_token); ?>" />
-						<input type="hidden" name="gateway" value="<?php echo esc_attr($gateway); ?>" />
 						<input type="hidden" name="submit-checkout" value="1" />
-						<input type="submit" id="pmpro_btn-submit" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_btn pmpro_btn-submit-checkout', 'pmpro_btn-submit-checkout' ) ); ?>" value="<?php esc_attr_e('Complete Payment', 'paid-memberships-pro' );?>" />
+						<input type="submit" id="pmpro_btn-submit" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_btn pmpro_btn-submit-checkout', 'pmpro_btn-submit-checkout' ) ); ?>" value="<?php esc_attr_e('Continue To Payment', 'paid-memberships-pro' );?>" />
 					</span>
+
+				<?php } elseif ( $pmpro_review ) { ?>
+				<span id="pmpro_submit_span">
+					<input type="hidden" name="confirm" value="1" />
+					<input type="hidden" name="token" value="<?php echo esc_attr($pmpro_paypal_token); ?>" />
+					<input type="hidden" name="submit-checkout" value="1" />
+					<input type="submit" id="pmpro_btn-submit" class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_btn pmpro_btn-submit-checkout', 'pmpro_btn-submit-checkout' ) ); ?>" value="<?php esc_attr_e('Complete Payment', 'paid-memberships-pro' );?>" />
+				</span>
 
 				<?php } else { ?>
 

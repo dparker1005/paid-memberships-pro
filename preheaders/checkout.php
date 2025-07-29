@@ -24,7 +24,6 @@ if ( ! empty( $_REQUEST['pmpro_order'] ) ) {
 		// We are reworking this variable to maintain backwards compatiblity with custom page templates and
 		// setting it whenever a token order is passed in the URL and requires addtional payment steps.
 		$pmpro_review = $order_obj;
-		$review_order_passed = true;
 
 		// If the order is not for the current user or the order is in error status, redirect to the account page.
 		if ( $current_user->ID != $pmpro_review->user_id || 'error' === $pmpro_review->status ) {
@@ -46,23 +45,8 @@ if ( ! empty( $_REQUEST['pmpro_order'] ) ) {
 	}
 }
 
-//was a gateway passed?
-if ( ! empty( $pmpro_review ) ) {
-	$gateway = $pmpro_review->gateway;
-} elseif ( ! empty( $_REQUEST['gateway'] ) ) {
-	$gateway = sanitize_text_field($_REQUEST['gateway']);
-} else {
-	$gateway = get_option( "pmpro_gateway" );
-}
-
-//set valid gateways - the active gateway in the settings and any gateway added through the filter will be allowed
-$valid_gateways = apply_filters( "pmpro_valid_gateways", array( get_option( "pmpro_gateway" ) ) );
-
-//let's add an error now, if an invalid gateway is set
-if ( ! in_array( $gateway, $valid_gateways ) ) {
-	$pmpro_msg  = __( "Invalid gateway.", 'paid-memberships-pro' );
-	$pmpro_msgt = "pmpro_error";
-}
+// Get the gateway to use for this context.
+$gateway = pmpro_getGateway();
 
 /**
  * Action to run extra preheader code before setting checkout level.
@@ -552,9 +536,6 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 			$pmpro_error_fields[] = "bemail";
 			$pmpro_error_fields[] = "bconfirmemail";
 		}
-		if ( ! in_array( $gateway, $valid_gateways ) ) {
-			pmpro_setMessage( __( "Invalid gateway.", 'paid-memberships-pro' ), "pmpro_error" );
-		}
 		if ( ! empty( $fullname ) ) {
 			pmpro_setMessage( __( "Are you a spammer?", 'paid-memberships-pro' ), "pmpro_error" );
 		}
@@ -586,7 +567,6 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 		$pmpro_review->accountnumber    = $AccountNumber;
 		$pmpro_review->expirationmonth  = $ExpirationMonth;
 		$pmpro_review->expirationyear   = $ExpirationYear;
-		$pmpro_review->gateway          = $pmpro_requirebilling ? $gateway : 'free';
 		$pmpro_review->billing          = new stdClass();
 		$pmpro_review->billing->name    = $bfirstname . " " . $blastname;
 		$pmpro_review->billing->street  = trim( $baddress1 );
@@ -602,8 +582,33 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 		$pmpro_review->tax              = pmpro_round_price( $pmpro_review->getTax( true ) );
 		$pmpro_review->total            = pmpro_round_price( $pmpro_review->subtotal + $pmpro_review->tax );
 
+		// Determine which gateway to use.
+		if ( empty( $pmpro_requirebilling ) ) {
+			$pmpro_review->gateway = 'free';
+		} elseif( ! empty( get_option( 'pmpro_separate_payment_step' ) ) ) {
+			// This is multistep and the main checkout page was just submitted.
+			// Save the order in token status so that we can continue to payment.
+			$pmpro_review->status = 'token';
+			$pmpro_review->saveOrder();
+			pmpro_save_checkout_data_to_order( $pmpro_review );
+
+			// If we only have one enabled gateway, use that. Otherwise, set the gateway to the empty string so that the user can choose a gateway on the next step.
+			$enabled_gateways = pmpro_get_enabled_gateways();
+			if ( count( $enabled_gateways ) == 1 ) {
+				$gateway = reset( $enabled_gateways );
+				$pmpro_review->gateway = $gateway;
+			} else {
+				$pmpro_review->gateway = '';
+			}
+		} else {
+			// Otherwise, set the gateway to the determined gateway.
+			$pmpro_review->gateway = $gateway;
+		}
+
 		// Finish setting up the order.
-		$pmpro_review->setGateway();
+		if ( ! empty( $pmpro_review->gateway) ) {
+			$pmpro_review->setGateway();
+		}
 		$pmpro_review->getMembershipLevelAtCheckout();	
 
 		// Filter for order, since v1.8
@@ -613,10 +618,17 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 			$pmpro_review = apply_filters( 'pmpro_checkout_order_free', $pmpro_review );
 		}
 	}
-} // End if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) )
+} elseif ( $submit && $pmpro_msgt != 'pmpro_error' && ! empty( $pmpro_review ) && empty( $pmpro_review->gateway ) ) {
+	// A review order was passed. Check if it had a blank gateway and, if so, set it to the current gateway.
+	if ( ! empty( $gateway ) ) {
+		$pmpro_review->setGateway( $gateway );
+		$pmpro_review->saveOrder();
+		$gateway_just_set = true;
+	}
+}
 
 // If there is still a valid checkout submission, process the order.
-if ( $submit && $pmpro_msgt != "pmpro_error" && ! empty( $pmpro_review ) ) {
+if ( $submit && $pmpro_msgt != "pmpro_error" && ! empty( $pmpro_review ) && ! empty( $pmpro_review->gateway ) ) {
 	do_action( 'pmpro_checkout_before_processing' );
 
 	// Process the payment.
@@ -625,13 +637,7 @@ if ( $submit && $pmpro_msgt != "pmpro_error" && ! empty( $pmpro_review ) ) {
 		$pmpro_msg       = __( "Payment accepted.", 'paid-memberships-pro' );
 		$pmpro_msgt      = "pmpro_success";
 		$pmpro_confirmed = true;
-	} elseif ( empty( $review_order_passed ) && ! empty( get_option( 'pmpro_separate_payment_step' ) ) ) {
-		// This is multistep checkout and the main checkout page was just submitted.
-		// Save the order in token status so that we can continue to payment.
-		$pmpro_review->status = 'token';
-		$pmpro_review->saveOrder();
-		pmpro_save_checkout_data_to_order( $pmpro_review );
-	} else {
+	} elseif ( empty( $gateway_just_set) ) {
 		/**
 		 * Allow running code when processing fails.
 		 *
