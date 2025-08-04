@@ -1993,42 +1993,173 @@ class PMProGateway_stripe extends PMProGateway {
 			return;
 		}
 
+		// Get the level being purchased.
+		$level = $morder->getMembershipLevelAtCheckout();
+
+		/**
+		 * Filter to add price breakdown elements for Stripe.
+		 *
+		 * Each element is an associative array with the following keys:
+		 * - 'type' (string) - 'initial', 'recurring', or 'both'
+		 * - 'checkout_level_deduction_amount' (float) - the amount to deduct from the level charge
+		 * - 'slug' (string) - a slug to identify the product
+		 * - 'name' (string) - a name for the Stripe product if we need to make one
+		 * - 'tax_code' (string) - the tax code for the product, if applicable
+		 * - 'unit_price' (float) - the unit price of the product
+		 * - 'quantity' (int) - the quantity of the product
+		 *
+		 * @since TBD
+		 *
+		 * @param array $price_breakdown_elements Array of price breakdown elements.
+		 * @param object $level The membership level being purchased.
+		 * @return array Filtered array of price breakdown elements.
+		 */
+		$price_breakdown_elements = apply_filters( 'pmpro_stripe_price_breakdown_elements', array(), $level );
+
 		// Then, we need to build the line items array to charge.
 		$line_items = array();
+		$additional_line_items = array(); // These will be added to the end of the line items array so that the level charge is always first.
 
 		// Used to calculate Stripe Connect fees.
 		$application_fee_percentage = $stripe->get_application_fee_percentage();
 
 		// If the level is recurring, check if we can combine the initial and recurring payments.
-		$level = $morder->getMembershipLevelAtCheckout();
 		if ( pmpro_isLevelRecurring( $level ) ) {
 			$filtered_trial_period_days = $stripe->calculate_trial_period_days( $morder );
 			$unfiltered_trial_period_days = $stripe->calculate_trial_period_days( $morder, false );
+
+			// Check whether all price breakdown elements have "both" as their type.
+			$all_both = true;
+			foreach ( $price_breakdown_elements as $element ) {
+				if ( ! isset( $element['type'] ) || 'both' !== $element['type'] ) {
+					$all_both = false;
+					break;
+				}
+			}
 
 			$combine_initial_and_recurring = (
 				empty( $level->trial_limit ) && // Check if there is a trial period.
 				$filtered_trial_period_days === $unfiltered_trial_period_days && // Check if the trial period is the same as the filtered trial period.
 				empty( $level->profile_start_date ) && // Check if the profile start date set directly on the level is empty.
 				! empty( $level->initial_payment ) && // Check if there is an initial payment.
-				$level->initial_payment === $level->billing_amount // Check if the initial payment and recurring payment prices are the same.
+				$level->initial_payment === $level->billing_amount && // Check if the initial payment and recurring payment prices are the same.
+				$all_both // Check if all price breakdown elements are of type "both".
 			);
 		}
 
 		// If we have an initial payment that is not being combined into a recurring payment, we need to build the initial payment line item.
 		if ( ! empty( $level->initial_payment ) && empty( $combine_initial_and_recurring ) ) {
-			$initial_subtotal       = $level->initial_payment;
-			$initial_tax            = $morder->getTaxForPrice( $initial_subtotal );
-			$initial_payment_amount = pmpro_round_price( (float) $initial_subtotal + (float) $initial_tax );
-			$initial_payment_price  = $stripe->get_price_for_product( $product_id, $initial_payment_amount );
-			if ( is_string( $initial_payment_price ) ) {
-				// There was an error getting the price.
-				pmpro_setMessage( __( 'Could not get price for initial payment. ', 'paid-memberships-pro' ) . $initial_payment_price, 'pmpro_error', true );
-				return;
+			// Keep track of the initial payment data. We will be deducting price breakdown elements from this amount.
+			$initial_subtotal = $level->initial_payment;
+
+			// Process the price breakdown elements for the initial payment.
+			foreach ( $price_breakdown_elements as $element ) {
+				// Make sure we have a valid element.
+				if (
+					empty( $element['type'] ) ||
+					empty( $element['slug'] ) ||
+					empty( $element['name'] ) ||
+					empty( $element['unit_price'] ) ||
+					empty( $element['quantity'] )
+				) {
+					continue;
+				}
+
+				// If this element is only for recurring payments, skip it.
+				if ( 'recurring' === $element['type'] ) {
+					continue;
+				}
+
+				// Get the product ID for the element.
+				$element_product_id = get_option( 'pmpro_stripe_product_id_' . ( $morder->gateway_environment ) . '_' . $element['slug'] );
+				if ( ! empty( $element_product_id ) ) {
+					// Make sure the product exists.
+					try {
+						$element_product = Stripe_Product::retrieve( $element_product_id );
+					} catch ( \Throwable $e ) {
+						// Assume no product found.
+					} catch ( \Exception $e ) {
+						// Assume no product found.
+					}
+
+					if ( empty( $element_product ) || empty( $element_product->active ) ) {
+						// There was an error retrieving the product or the product is archived.
+						// Let's try to create a new one below.
+						$element_product_id = null;
+					}
+				}
+
+				// If we don't have a product ID for the element, create a new product.
+				if ( empty( $element_product_id ) ) {
+					// Create a new product for the element.
+					try {
+						$element_product_args = array(
+							'name' => $element['name'],
+						);
+						if ( ! empty( $element['tax_code'] ) ) {
+							$element_product_args['tax_code'] = $element['tax_code'];
+						}
+						$element_product = Stripe_Product::create( $element_product_args );
+						if ( ! empty( $element_product->id ) ) {
+							$element_product_id = $element_product->id;
+						} else {
+							// There was an error creating the product.
+							pmpro_setMessage( sprintf( __( 'Could not create product for the %s price breakdown element. ', 'paid-memberships-pro' ), $element['name'] ), 'pmpro_error', true );
+							return;
+						}
+					} catch ( \Throwable $e ) {
+						// There was an error creating the product.
+						pmpro_setMessage( sprintf( __( 'Could not create product for the %s price breakdown element. ', 'paid-memberships-pro' ), $element['name'] ) . $e->getMessage(), 'pmpro_error', true );
+						return;
+					} catch ( \Exception $e ) {
+						// There was an error creating the product.
+						pmpro_setMessage( sprintf( __( 'Could not create product for the %s price breakdown element. ', 'paid-memberships-pro' ), $element['name'] ) . $e->getMessage(), 'pmpro_error', true );
+						return;
+					}
+				}
+
+				// Save the product ID for the element.
+				update_option( 'pmpro_stripe_product_id_' . ( $morder->gateway_environment ) . '_' . $element['slug'], $element_product_id );
+
+				// Get the unit price for the element with tax calculated by PMPro (not Stripe Tax).
+				$element_unit_price_tax_amount = $morder->getTaxForPrice( $element['unit_price'] );
+				$element_unit_price_with_tax = pmpro_round_price( (float) $element['unit_price'] + (float) $element_unit_price_tax_amount );
+
+				// Get the price for the product.
+				$element_price = $stripe->get_price_for_product( $element_product_id, $element_unit_price_with_tax, null, null );
+				if ( is_string( $element_price ) ) {
+					// There was an error getting the price.
+					pmpro_setMessage( sprintf( __( 'Could not get price for the %s price breakdown element. ', 'paid-memberships-pro' ), $element['name'] ) . $element_price, 'pmpro_error', true );
+					return;
+				}
+
+				// Add the line item for the element.
+				$additional_line_items[] = array(
+					'price'    => $element_price->id,
+					'quantity' => $element['quantity'],
+				);
+
+				// Deduct the price breakdown element from the initial payment subtotal.
+				$initial_subtotal -= empty( $element['checkout_level_deduction_amount'] ) ? 0 : (float) $element['checkout_level_deduction_amount'];
 			}
-			$line_items[] = array(
-				'price'    => $initial_payment_price->id,
-				'quantity' => 1,
-			);
+
+			// Finish setting up the initial payment line item for the level itself.
+			if ( $initial_subtotal > 0  ) { 
+				$initial_tax            = $morder->getTaxForPrice( $initial_subtotal );
+				$initial_payment_amount = pmpro_round_price( (float) $initial_subtotal + (float) $initial_tax );
+				$initial_payment_price  = $stripe->get_price_for_product( $product_id, $initial_payment_amount );
+				if ( is_string( $initial_payment_price ) ) {
+					// There was an error getting the price.
+					pmpro_setMessage( __( 'Could not get price for initial payment. ', 'paid-memberships-pro' ) . $initial_payment_price, 'pmpro_error', true );
+					return;
+				}
+				$line_items[] = array(
+					'price'    => $initial_payment_price->id,
+					'quantity' => 1,
+				);
+			}
+
+			// Add additional data for the payment intent.
 			$payment_intent_data = array(
 				'description' => self::get_order_description( $morder ),
 			);
@@ -2042,19 +2173,111 @@ class PMProGateway_stripe extends PMProGateway {
 
 		// Now, let's handle the recurring payments.
 		if ( pmpro_isLevelRecurring( $level ) ) {
+			// Keep track of the recurring payment data. We will be deducting price breakdown elements from this amount.
 			$recurring_subtotal       = $level->billing_amount;
-			$recurring_tax            = $morder->getTaxForPrice( $recurring_subtotal );
-			$recurring_payment_amount = pmpro_round_price( (float) $recurring_subtotal + (float) $recurring_tax );
-			$recurring_payment_price  = $stripe->get_price_for_product( $product_id, $recurring_payment_amount, $level->cycle_period, $level->cycle_number );
-			if ( is_string( $recurring_payment_price ) ) {
-				// There was an error getting the price.
-				pmpro_setMessage( __( 'Could not get price for recurring payment. ', 'paid-memberships-pro' ) . $recurring_payment_price, 'pmpro_error', true );
-				return;
+
+			// Process the price breakdown elements for the recurring payment.
+			foreach ( $price_breakdown_elements as $element ) {
+				// Make sure we have a valid element.
+				if (
+					empty( $element['type'] ) ||
+					empty( $element['slug'] ) ||
+					empty( $element['name'] ) ||
+					empty( $element['unit_price'] ) ||
+					empty( $element['quantity'] )
+				) {
+					continue;
+				}
+
+				// If this element is only for initial payments, skip it.
+				if ( 'initial' === $element['type'] ) {
+					continue;
+				}
+
+				// Get the product ID for the element.
+				$element_product_id = get_option( 'pmpro_stripe_product_id_' . ( $morder->gateway_environment ) . '_' . $element['slug'] );
+				if ( ! empty( $element_product_id ) ) {
+					// Make sure the product exists.
+					try {
+						$element_product = Stripe_Product::retrieve( $element_product_id );
+					} catch ( \Throwable $e ) {
+						// Assume no product found.
+					} catch ( \Exception $e ) {
+						// Assume no product found.
+					}
+
+					if ( empty( $element_product ) || empty( $element_product->active ) ) {
+						// There was an error retrieving the product or the product is archived.
+						// Let's try to create a new one below.
+						$element_product_id = null;
+					}
+				}
+
+				// If we don't have a product ID for the element, create a new product.
+				if ( empty( $element_product_id ) ) {
+					try {
+						$element_product_args = array(
+							'name' => $element['name'],
+						);
+						if ( ! empty( $element['tax_code'] ) ) {
+							$element_product_args['tax_code'] = $element['tax_code'];
+						}
+						$element_product = Stripe_Product::create( $element_product_args );
+						if ( ! empty( $element_product->id ) ) {
+							$element_product_id = $element_product->id;
+						} else {
+							pmpro_setMessage( sprintf( __( 'Could not create product for the %s price breakdown element. ', 'paid-memberships-pro' ), $element['name'] ), 'pmpro_error', true );
+							return;
+						}
+					} catch ( \Throwable $e ) {
+						pmpro_setMessage( sprintf( __( 'Could not create product for the %s price breakdown element. ', 'paid-memberships-pro' ), $element['name'] ) . $e->getMessage(), 'pmpro_error', true );
+					} catch ( \Exception $e ) {
+						pmpro_setMessage( sprintf( __( 'Could not create product for the %s price breakdown element. ', 'paid-memberships-pro' ), $element['name'] ) . $e->getMessage(), 'pmpro_error', true );
+					}
+				}
+
+				// Save the product ID for the element.
+				update_option( 'pmpro_stripe_product_id_' . ( $morder->gateway_environment ) . '_' . $element['slug'], $element_product_id );
+
+				// Get the unit price for the element with tax calculated by PMPro (not Stripe Tax).
+				$element_unit_price_tax_amount = $morder->getTaxForPrice( $element['unit_price'] );
+				$element_unit_price_with_tax = pmpro_round_price( (float) $element['unit_price'] + (float) $element_unit_price_tax_amount );
+
+				// Get the price for the product.
+				$element_price = $stripe->get_price_for_product( $element_product_id, $element_unit_price_with_tax, $level->cycle_period, $level->cycle_number );
+				if ( is_string( $element_price ) ) {
+					// There was an error getting the price.
+					pmpro_setMessage( sprintf( __( 'Could not get price for the %s price breakdown element. ', 'paid-memberships-pro' ), $element['name'] ) . $element_price, 'pmpro_error', true );
+					return;
+				}
+
+				// Add the line item for the element.
+				$additional_line_items[] = array(
+					'price'    => $element_price->id,
+					'quantity' => $element['quantity'],
+				);
+
+				// Deduct the price breakdown element from the recurring payment subtotal.
+				$recurring_subtotal -= empty( $element['checkout_level_deduction_amount'] ) ? 0 : (float) $element['checkout_level_deduction_amount'];
 			}
-			$line_items[] = array(
-				'price'    => $recurring_payment_price->id,
-				'quantity' => 1,
-			);
+
+			// Finish setting up the recurring payment line item for the level itself.
+			if ( $recurring_subtotal > 0 ) {	
+				$recurring_tax            = $morder->getTaxForPrice( $recurring_subtotal );
+				$recurring_payment_amount = pmpro_round_price( (float) $recurring_subtotal + (float) $recurring_tax );
+				$recurring_payment_price  = $stripe->get_price_for_product( $product_id, $recurring_payment_amount, $level->cycle_period, $level->cycle_number );
+				if ( is_string( $recurring_payment_price ) ) {
+					// There was an error getting the price.
+					pmpro_setMessage( __( 'Could not get price for recurring payment. ', 'paid-memberships-pro' ) . $recurring_payment_price, 'pmpro_error', true );
+					return;
+				}
+				$line_items[] = array(
+					'price'    => $recurring_payment_price->id,
+					'quantity' => 1,
+				);
+			}
+
+			// Set up additional data for the subscription.
 			$subscription_data = array(
 				'description' => self::get_order_description( $morder ),
 			);
@@ -2070,6 +2293,13 @@ class PMProGateway_stripe extends PMProGateway {
 			if ( ! empty( $application_fee_percentage ) ) {
 				$subscription_data['application_fee_percent'] = $application_fee_percentage;
 			}
+		}
+
+		// Add the additional line items to the end of the line items array.
+		if ( ! empty( $additional_line_items ) ) {
+			// If we have additional line items, we need to add them to the end of the line items array.
+			// This is so that the level charge is always first.
+			$line_items = array_merge( $line_items, $additional_line_items );
 		}
 
 		// Set up tax and billing address collection.
