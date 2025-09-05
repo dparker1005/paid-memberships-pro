@@ -666,6 +666,7 @@ function pmpro_db_delta() {
 			`startdate` datetime DEFAULT NULL,
 			`enddate` datetime DEFAULT NULL,
 			`next_payment_date` datetime DEFAULT NULL,
+			`failed_payment_date` datetime DEFAULT NULL,
 			`billing_amount` decimal(18,8) NOT NULL DEFAULT '0.00',
 			`cycle_number` int(11) NOT NULL DEFAULT '0',
 			`cycle_period` varchar(10) NOT NULL DEFAULT 'Month',
@@ -676,7 +677,8 @@ function pmpro_db_delta() {
 			PRIMARY KEY (`id`),
 			UNIQUE KEY `subscription_link` (`subscription_transaction_id`, `gateway_environment`, `gateway`),
 			KEY `user_id` (`user_id`),
-			KEY `next_payment_date` (`next_payment_date`)
+			KEY `next_payment_date` (`next_payment_date`),
+			KEY `failed_payment_date` (`failed_payment_date`)
 		) $collate;
 	";
 	dbDelta($sqlQuery);

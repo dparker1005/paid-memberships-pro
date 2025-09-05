@@ -158,3 +158,57 @@ function pmpro_update_order_with_recent_payment_method( $order ){
 
 
 }
+
+/**
+ * Filter to set the failed payment date for a subscription on failed payments.
+ *
+ * @since TBD
+ *
+ * @param MemberOrder $old_order An old order for the subscription whose payment failed.
+ */
+function pmpro_set_failed_payment_date_on_subscription_from_old_order( $old_order ) {
+	// If we don't have an old order, bail.
+	if ( empty( $old_order ) ) {
+		return;
+	}
+
+	// Get the subscription associated with the old order.
+	$subscription = $old_order->get_subscription();
+	if ( empty( $subscription ) ) {
+		return;
+	}
+
+	// If the subscription already has a failed payment date, keep the old one.
+	if ( ! empty( $subscription->get_failed_payment_date() ) ) {
+		return;
+	}
+
+	$subscription->set( 'failed_payment_date', gmdate( 'Y-m-d H:i:s' ) );
+	$subscription->save();
+}
+add_action( 'pmpro_subscription_payment_failed', 'pmpro_set_failed_payment_date_on_subscription_from_old_order' );
+
+/**
+ * Filter to clear the failed payment date on subscription when payment is successful.
+ *
+ * @since TBD
+ *
+ * @param MemberOrder $order The order that was successfully processed.
+ */
+function pmpro_clear_failed_payment_date_on_subscription_from_successful_order( $order ) {
+	// If we don't have an order, bail.
+	if ( empty( $order ) ) {
+		return;
+	}
+
+	// Get the subscription associated with the old order.
+	$subscription = $order->get_subscription();
+	if ( empty( $subscription ) ) {
+		return;
+	}
+
+	// Clear the failed payment date.
+	$subscription->set( 'failed_payment_date', '' );
+	$subscription->save();
+}
+add_action( 'pmpro_subscription_payment_completed', 'pmpro_clear_failed_payment_date_on_subscription_from_successful_order' );

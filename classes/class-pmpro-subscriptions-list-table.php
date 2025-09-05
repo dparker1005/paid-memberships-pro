@@ -149,13 +149,14 @@ class PMPro_Subscriptions_List_Table extends WP_List_Table {
 			'status'                      => __( 'Status', 'paid-memberships-pro' ),
 			'startdate'                   => __( 'Created', 'paid-memberships-pro' ),
 			'next_payment_date'           => __( 'Next Payment', 'paid-memberships-pro' ),
+			'failed_payment_date'         => __( 'Failed Payment', 'paid-memberships-pro' ),
 			'enddate'                     => __( 'Ended', 'paid-memberships-pro' ),
 			'orders'                      => __( 'Orders', 'paid-memberships-pro' ),
 		);
 
 		// If we are filtering by status, we either want to remove the next_payment_date or the enddate column.
 		if ( ! empty( $_REQUEST['status'] ) ) {
-			if ( $_REQUEST['status'] == 'active' ) {
+			if ( $_REQUEST['status'] == 'active' || $_REQUEST['status'] == 'pastdue' ) {
 				unset( $columns['enddate'] );
 			} elseif ( $_REQUEST['status'] == 'cancelled' ) {
 				unset( $columns['next_payment_date'] );
@@ -222,6 +223,7 @@ class PMPro_Subscriptions_List_Table extends WP_List_Table {
 			'user' => array( 's.user_id', false ),
 			'startdate' => array( 's.startdate', true ),
 			'next_payment_date' => array( 's.next_payment_date', false ),
+			'failed_payment_date' => array( 's.failed_payment_date', false ),
 			'enddate' => array( 's.enddate', true ),
 		);
 		return $sortable_columns;
@@ -272,6 +274,8 @@ class PMPro_Subscriptions_List_Table extends WP_List_Table {
 		if ( ! empty( $status ) ) {
 			if ( $status === 'sync_error' ) {
 				$condition .= ' AND sm.meta_value IS NOT NULL';
+			} elseif ( $status === 'pastdue' ) {
+				$condition .= ' AND s.failed_payment_date <> "" AND s.status = "active"';
 			} else {
 				$condition .= ' AND s.status = "' . esc_sql( $status ) . '"';
 			}
@@ -392,6 +396,7 @@ class PMPro_Subscriptions_List_Table extends WP_List_Table {
 					<option value=""><?php esc_html_e( 'All Statuses', 'paid-memberships-pro' ); ?></option>
 					<option value="active" <?php selected( $status, 'active' ); ?>><?php esc_html_e( 'Active', 'paid-memberships-pro' ); ?></option>
 					<option value="cancelled" <?php selected( $status, 'cancelled' ); ?>><?php esc_html_e( 'Cancelled', 'paid-memberships-pro' ); ?></option>
+					<option value="pastdue" <?php selected( $status, 'pastdue' ); ?>><?php esc_html_e( 'Past Due', 'paid-memberships-pro' ); ?></option>
 					<option value="sync_error" <?php selected( $status, 'sync_error' ); ?>><?php esc_html_e( 'Sync Error', 'paid-memberships-pro' ); ?></option>
 				</select>
 				<input type="hidden" name="page" value="pmpro-subscriptions"/>
@@ -620,6 +625,30 @@ class PMPro_Subscriptions_List_Table extends WP_List_Table {
 	public function column_next_payment_date( $item ) {
 		$date_to_show = $item->get_next_payment_date( get_option( 'date_format' ) );
 		$time_to_show = $item->get_next_payment_date( get_option( 'time_format' ) );
+		if ( ! empty( $date_to_show ) ) {
+			echo esc_html(
+				sprintf(
+					// translators: %1$s is the date and %2$s is the time.
+					__( '%1$s at %2$s', 'paid-memberships-pro' ),
+					esc_html( $date_to_show ),
+					esc_html( $time_to_show )
+				)
+			);
+		} else {
+			esc_html_e( '&#8212;', 'paid-memberships-pro' );
+		}
+	}
+
+	/**
+	 * Renders the columns subscription failed payment date.
+	 *
+	 * @param object  $item
+	 *
+	 * @return string
+	 */
+	public function column_failed_payment_date( $item ) {
+		$date_to_show = $item->get_failed_payment_date( get_option( 'date_format' ) );
+		$time_to_show = $item->get_failed_payment_date( get_option( 'time_format' ) );
 		if ( ! empty( $date_to_show ) ) {
 			echo esc_html(
 				sprintf(

@@ -112,6 +112,15 @@ class PMPro_Subscription {
 	protected $next_payment_date = '';
 
 	/**
+	 * If the subscription is past-due, the date that the payment failed.
+	 *
+	 * @since TBD
+	 *
+	 * @var string
+	 */
+	protected $failed_payment_date = '';
+
+	/**
 	 * The subscription billing amount.
 	 *
 	 * @since 3.0
@@ -732,6 +741,20 @@ class PMPro_Subscription {
 	}
 
 	/**
+	 * Get the failed payment date for this subscription.
+	 *
+	 * @since 3.0
+	 *
+	 * @param string $format     Format to return the date in.
+	 * @param bool   $local_time Whether to return the date in local time or UTC.
+	 *
+	 * @return string|null Date in the requested format.
+	 */
+	public function get_failed_payment_date( $format = 'timestamp', $local_time = true ) {
+		return $this->format_subscription_date( $this->failed_payment_date, $format, $local_time );
+	}	
+
+	/**
 	 * Get the start date for this subscription.
 	 *
 	 * @since 3.0
@@ -1085,6 +1108,7 @@ class PMPro_Subscription {
 				'startdate'                   => $this->startdate,
 				'enddate'                     => $this->enddate,
 				'next_payment_date'           => $this->next_payment_date,
+				'failed_payment_date'         => $this->failed_payment_date,
 				'billing_amount'              => $this->billing_amount,
 				'cycle_number'                => $this->cycle_number,
 				'cycle_period'                => $this->cycle_period,
@@ -1103,6 +1127,7 @@ class PMPro_Subscription {
 				'%s', // startdate
 				'%s', // enddate
 				'%s', // next_payment_date
+				'%s', // failed_payment_date
 				'%f', // billing_amount
 				'%d', // cycle_number
 				'%s', // cycle_period
