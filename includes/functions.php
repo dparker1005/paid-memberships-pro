@@ -1405,6 +1405,25 @@ function pmpro_do_action_after_all_membership_level_changes( $filter_contents = 
 	$pmpro_old_user_levels_copy = $pmpro_old_user_levels;
 	$pmpro_old_user_levels = null;
 
+	// Set up asynchronous "after all membership level changes" action with Action Scheduler.
+	if ( has_action( 'pmpro_after_all_membership_level_changes_async' ) ) {
+		$action_scheduler = PMPro_Action_Scheduler::instance();
+		foreach ( $pmpro_old_user_levels_copy as $user_id => $old_levels ) {
+			$group = 'pmpro_user_' . $user_id . '_after_all_membership_level_changes_async';
+
+			// If we already have a pending task for this user, skip adding another one.
+			if ( ! empty( $action_scheduler->list_tasks( $group, 'pmpro_after_all_membership_level_changes_async' ) ) ) {
+				continue;
+			}
+
+			$action_scheduler->maybe_add_task(
+				'pmpro_after_all_membership_level_changes_async',
+				array( $user_id => $old_levels ),
+				$group
+			);
+		}
+	}
+
 	/**
 	 * Run code after all membership level changes have occurred. Users who have had changes
 	 * will be stored in the global $pmpro_old_user_levels array.
