@@ -1618,6 +1618,216 @@ a.pmpro_order-renewal {
 	-moz-osx-font-smoothing: grayscale;
 }
 
+/* Orders stackable filters */
+.pmpro_admin-pmpro-orders .tablenav.top {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	height: auto;
+	overflow: visible;
+}
+
+.pmpro_admin-pmpro-orders .tablenav.top .alignleft.actions {
+	display: none;
+}
+
+.pmpro_admin-pmpro-orders .tablenav.top .tablenav-pages {
+	float: none;
+	margin: 0;
+}
+
+.pmpro_admin-pmpro-orders .tablenav.top br.clear {
+	display: none;
+}
+
+.pmpro-orders-filters {
+	align-items: center;
+	display: flex;
+	flex: 1;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+}
+
+.pmpro-orders-filter-row {
+	align-items: center;
+	background: #f0f0f1;
+	border: 1px solid #c3c4c7;
+	border-radius: 3px;
+	display: inline-flex;
+	font-size: 13px;
+	line-height: 1;
+}
+
+.pmpro-orders-filter-label {
+	color: #50575e;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 0 6px;
+	white-space: nowrap;
+}
+
+.pmpro-orders-filter-row select,
+.pmpro-orders-filter-row input[type="date"] {
+	border: none;
+	border-left: 1px solid #c3c4c7;
+	border-radius: 0;
+	font-size: 13px;
+	height: 28px;
+	line-height: 28px;
+	margin: 0;
+	min-height: 28px;
+	padding: 0 6px;
+}
+
+.pmpro-orders-filter-row .select2-container {
+	min-width: 120px !important;
+}
+
+.pmpro-orders-filter-row .select2-container .select2-selection--single {
+	border: none;
+	border-left: 1px solid #c3c4c7;
+	border-radius: 0;
+	height: 28px;
+}
+
+.pmpro-orders-filter-row .select2-container .select2-selection--single .select2-selection__rendered {
+	font-size: 13px;
+	line-height: 28px;
+	padding: 0 20px 0 6px;
+}
+
+.pmpro-orders-filter-row .select2-container .select2-selection--single .select2-selection__arrow {
+	height: 28px;
+}
+
+.pmpro-orders-filter-remove {
+	align-items: center;
+	background: none;
+	border: none;
+	border-left: 1px solid #c3c4c7;
+	color: #787c82;
+	cursor: pointer;
+	display: inline-flex;
+	height: 28px;
+	justify-content: center;
+	padding: 0;
+	width: 24px;
+}
+
+.pmpro-orders-filter-remove:hover {
+	background: #dc3232;
+	color: #fff;
+}
+
+.pmpro-orders-filter-remove .dashicons {
+	font-size: 14px;
+	height: 14px;
+	width: 14px;
+}
+
+.pmpro-orders-filter-actions {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+}
+
+.pmpro-orders-filter-add-wrapper {
+	position: relative;
+}
+
+#pmpro-orders-add-filter {
+	align-items: center;
+	background: none;
+	border: 1px dashed #c3c4c7;
+	border-radius: 3px;
+	color: #2271b1;
+	cursor: pointer;
+	display: inline-flex;
+	font-size: 12px;
+	gap: 2px;
+	height: 28px;
+	padding: 0 8px;
+}
+
+#pmpro-orders-add-filter:hover {
+	border-color: #2271b1;
+	color: #135e96;
+}
+
+#pmpro-orders-add-filter .dashicons {
+	font-size: 14px;
+	height: 14px;
+	line-height: 1;
+	width: 14px;
+}
+
+.pmpro-orders-filter-type-dropdown {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 3px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+	left: 0;
+	min-width: 160px;
+	position: absolute;
+	top: 100%;
+	z-index: 100;
+}
+
+.pmpro-orders-filter-type-option {
+	background: none;
+	border: none;
+	cursor: pointer;
+	display: block;
+	font-size: 13px;
+	padding: 6px 10px;
+	text-align: left;
+	width: 100%;
+}
+
+.pmpro-orders-filter-type-option:hover {
+	background-color: #f0f6fc;
+	color: #2271b1;
+}
+
+.pmpro-orders-filter-date {
+	align-items: center;
+	display: inline-flex;
+	gap: 0;
+}
+
+.pmpro-orders-filter-date .pmpro-orders-date-mode-select {
+	border: none;
+	border-left: 1px solid #c3c4c7;
+	border-radius: 0;
+	font-size: 13px;
+	height: 28px;
+	margin: 0;
+	min-height: 28px;
+	padding: 0 20px 0 6px;
+}
+
+.pmpro-orders-date-predefined,
+.pmpro-orders-date-custom {
+	align-items: center;
+	display: inline-flex;
+	gap: 0;
+}
+
+.pmpro-orders-date-custom span {
+	border-left: 1px solid #c3c4c7;
+	font-size: 12px;
+	padding: 0 4px;
+}
+
+.pmpro-orders-filter-actions .button-primary {
+	font-size: 12px;
+	height: 28px;
+	line-height: 26px;
+	min-height: 28px;
+	padding: 0 10px;
+}
+
 .pmpro_admin-pmpro-orders h1.wp-heading-inline {
 	margin-top: 0;
 }
