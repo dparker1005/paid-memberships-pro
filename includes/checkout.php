@@ -233,8 +233,8 @@ function pmpro_pull_checkout_data_from_order( $order ) {
 		'enddate'         => $enddate
 	);
 
-	//change level and continue "checkout"
-	if ( pmpro_changeMembershipLevel( $custom_level, $order->user_id, 'changed' ) !== false ) {
+	// Skip the level change for non-membership checkouts (level ID 0), otherwise assign the level.
+	if ( empty( $custom_level['membership_id'] ) || pmpro_changeMembershipLevel( $custom_level, $order->user_id, 'changed' ) !== false ) {
 		// Mark the order as successful.
 		$order->status = "success";
 		if ( ! empty( $discount_code_id ) ) {
@@ -278,16 +278,32 @@ function pmpro_pull_checkout_data_from_order( $order ) {
 		// Check if we should send emails.
 		if ( apply_filters( 'pmpro_send_checkout_emails', true, $order ) ) {
 			// Set up some values for the emails.
-			$user                   = get_userdata( $order->user_id );
-			$user->membership_level = $pmpro_level;        // Make sure that they have the right level info.
+			$user = get_userdata( $order->user_id );
 
-			// Send email to member.
-			$pmproemail = new PMProEmail();
-			$pmproemail->sendCheckoutEmail( $user, $order );
+			/**
+			 * Filter the user object used for checkout emails.
+			 *
+			 * Allows overriding the user for cases where no WordPress user
+			 * exists, such as guest checkouts.
+			 *
+			 * @since TBD
+			 *
+			 * @param WP_User|false $user  The user object, or false if not found.
+			 * @param MemberOrder   $order The order being processed.
+			 */
+			$user = apply_filters( 'pmpro_checkout_email_user', $user, $order );
 
-			// Send email to admin.
-			$pmproemail = new PMProEmail();
-			$pmproemail->sendCheckoutAdminEmail( $user, $order );
+			if ( ! empty( $user ) ) {
+				$user->membership_level = $pmpro_level;
+
+				// Send email to member.
+				$pmproemail = new PMProEmail();
+				$pmproemail->sendCheckoutEmail( $user, $order );
+
+				// Send email to admin.
+				$pmproemail = new PMProEmail();
+				$pmproemail->sendCheckoutAdminEmail( $user, $order );
+			}
 		}
 
 		return true;

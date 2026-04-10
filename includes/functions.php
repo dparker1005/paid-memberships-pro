@@ -2612,24 +2612,24 @@ function pmpro_getLevelAtCheckout( $level_id = null, $discount_code = null ) {
 	// Reset $pmpro_level global.
 	$pmpro_level = null;
 
-	// Default to level passed in via URL.
-	if ( empty( $level_id ) && ! empty( $_REQUEST['pmpro_level'] ) ) {
+	// Default to level passed in via URL. Level ID 0 is valid for non-membership checkouts.
+	if ( is_null( $level_id ) && isset( $_REQUEST['pmpro_level'] ) ) {
 		$level_id = intval( $_REQUEST['pmpro_level'] );
 	}
 
 	// If we don't have a level, check the legacy 'level' request parameter.
-	if ( empty( $level_id ) && ! empty( $_REQUEST['level'] ) ) {
+	if ( is_null( $level_id ) && isset( $_REQUEST['level'] ) ) {
 		// TODO: We may want to show a message here that the level parameter is deprecated.
 		$level_id = intval( $_REQUEST['level'] );
 	}
 
 	// If we still don't have a level yet, check for a default level in the custom fields for this post.
-	if ( empty( $level_id ) && ! empty( $post ) ) {
+	if ( is_null( $level_id ) && ! empty( $post ) ) {
 		$level_id = intval( get_post_meta( $post->ID, 'pmpro_default_level', true ) );
 	}
 
 	// If we still don't have a level, use the default level.
-	if ( empty( $level_id ) ) {
+	if ( is_null( $level_id ) || ( empty( $level_id ) && $level_id !== 0 ) ) {
 		$all_levels = pmpro_getAllLevels( false, false );
 
 		if ( ! empty( $all_levels ) ) {
@@ -2642,8 +2642,8 @@ function pmpro_getLevelAtCheckout( $level_id = null, $discount_code = null ) {
 		$level_id = apply_filters( 'pmpro_default_level', intval( $default_level ) );
 	}
 
-	// If we still don't have a level, bail.
-	if ( empty( $level_id ) || intval( $level_id ) < 1 ) {
+	// If we still don't have a level, bail. Level ID 0 is allowed for non-membership checkouts (e.g., donations).
+	if ( is_null( $level_id ) || $level_id === false || $level_id === '' || intval( $level_id ) < 0 ) {
 		return;
 	}
 
@@ -2690,6 +2690,25 @@ function pmpro_getLevelAtCheckout( $level_id = null, $discount_code = null ) {
 	// If we don't have a level object yet, pull it from the database.
 	if ( empty( $pmpro_level ) && ! empty( $level_id ) ) {
 		$pmpro_level = $wpdb->get_row( "SELECT * FROM $wpdb->pmpro_membership_levels WHERE id = '" . esc_sql( $level_id ) . "' AND allow_signups = 1 LIMIT 1" );
+	}
+
+	// Build a default level object for level ID 0 (non-membership checkouts).
+	if ( empty( $pmpro_level ) && intval( $level_id ) === 0 ) {
+		$pmpro_level                    = new stdClass();
+		$pmpro_level->id                = 0;
+		$pmpro_level->name              = '';
+		$pmpro_level->description       = '';
+		$pmpro_level->confirmation      = '';
+		$pmpro_level->initial_payment   = 0;
+		$pmpro_level->billing_amount    = 0;
+		$pmpro_level->cycle_number      = 0;
+		$pmpro_level->cycle_period      = '';
+		$pmpro_level->billing_limit     = 0;
+		$pmpro_level->trial_amount      = 0;
+		$pmpro_level->trial_limit       = 0;
+		$pmpro_level->expiration_number = 0;
+		$pmpro_level->expiration_period = '';
+		$pmpro_level->allow_signups     = 1;
 	}
 
 	// Filter the level (for upgrades, etc).
@@ -4678,7 +4697,7 @@ function pmpro_compare_siteurl() {
  * When the pmpro_last_known_url option is updated, base64 encode it to
  * prevent string replacements from changing it when the site is migrated.
  *
- * @since 3.5
+ * @since TBD
  * @link https://developer.wordpress.org/reference/hooks/pre_update_option_option/
  *
  * @param string $new_value The new value for the option.

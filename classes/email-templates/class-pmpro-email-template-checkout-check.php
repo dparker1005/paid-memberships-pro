@@ -91,7 +91,7 @@ class PMPro_Email_Template_Checkout_Check extends PMPro_Email_Template {
 
 <p>Account: {{ display_name }} ({{ user_email }})</p>
 
-<p>Membership Level: {{ membership_level_name }}</p>
+{% if membership_level_name %}<p>Membership Level: {{ membership_level_name }}</p>{% endif %}
 
 <p>Membership Fee: {{ membership_cost }}</p>
 
@@ -179,10 +179,7 @@ class PMPro_Email_Template_Checkout_Check extends PMPro_Email_Template {
 	public function get_email_template_variables() {
 		$order = $this->order;
 		$user = $this->user;
-		$membership_level = pmpro_getSpecificMembershipLevelForUser( $user->ID, $order->membership_id );
-		if ( empty( $membership_level ) ) {
-			$membership_level = pmpro_getLevel( $order->membership_id );
-		}
+		$membership_level = $order->getMembershipLevelAtCheckout();
 
 		$discount_code = "";
 		$discount_code_name = '';
@@ -211,7 +208,7 @@ class PMPro_Email_Template_Checkout_Check extends PMPro_Email_Template {
 			'user_login' => $user->user_login,
 			'user_email' => $user->user_email,
 			'membership_id' => $membership_level->id,
-			'membership_level_name' => $membership_level->name,
+			'membership_level_name' => ! empty( $membership_level->name ) ? $membership_level->name : '',
 			'membership_level_confirmation_message' => $confirmation_message,
 			'membership_cost' => pmpro_getLevelCost($membership_level),
 			'membership_expiration' => $membership_expiration,

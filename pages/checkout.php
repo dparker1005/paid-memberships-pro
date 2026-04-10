@@ -97,6 +97,7 @@ if ( empty( $default_gateway ) ) {
 
 					<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_card_content' ) ); ?>">
 
+						<?php if ( ! empty( $pmpro_level->name ) ) { ?>
 						<p class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_level_name_text' ) );?>">
 							<?php
 							// Tell the user which level they are signing up for.
@@ -130,6 +131,7 @@ if ( empty( $default_gateway ) ) {
 							}
 							?>
 						</p> <!-- end pmpro_level_name_text -->
+						<?php } ?>
 
 						<?php
 							/**
@@ -246,6 +248,7 @@ if ( empty( $default_gateway ) ) {
 							</legend>
 							<?php if ( ! $skip_account_fields ) { ?>
 								<div class="<?php echo esc_attr( pmpro_get_element_class( 'pmpro_form_fields' ) ); ?>">
+									<?php do_action( 'pmpro_checkout_before_account_fields' ); ?>
 									<?php
 										// Get discount code from URL parameter, so if the user logs in it will keep it applied.
 										$discount_code_link = ! empty( $discount_code) ? '&pmpro_discount_code=' . $discount_code : '';

@@ -81,9 +81,26 @@ $pmpro_level = pmpro_getLevelAtCheckout();
  */
 do_action( 'pmpro_checkout_preheader_after_get_level_at_checkout', $pmpro_level );
 
-if ( empty( $pmpro_level->id ) ) {
+if ( ! is_object( $pmpro_level ) || ( empty( $pmpro_level->id ) && $pmpro_level->id !== 0 ) ) {
 	wp_redirect( pmpro_url( "levels" ) );
 	exit( 0 );
+}
+
+// Standalone checkouts (level_id=0) must be explicitly allowed by an add-on.
+if ( intval( $pmpro_level->id ) === 0 ) {
+	/**
+	 * Filter whether standalone checkouts (level_id=0) are allowed.
+	 *
+	 * Defaults to false. Add Ons like Donations hook this to return true.
+	 *
+	 * @since TBD
+	 *
+	 * @param bool $allowed Whether standalone checkouts are allowed.
+	 */
+	if ( ! apply_filters( 'pmpro_allow_standalone_checkout', false ) ) {
+		wp_redirect( pmpro_url( 'levels' ) );
+		exit;
+	}
 }
 
 //enqueue some scripts
@@ -119,7 +136,8 @@ if ( ! $besecure && ! empty( $_REQUEST['submit-checkout'] ) && is_ssl() ) {
 do_action( 'pmpro_checkout_preheader', $pmpro_level );
 
 // We set a global var for add-ons that are expecting it.
-$pmpro_show_discount_code = pmpro_show_discount_code();
+// Discount codes don't apply to non-membership checkouts (level ID 0).
+$pmpro_show_discount_code = intval( $pmpro_level->id ) === 0 ? false : pmpro_show_discount_code();
 
 /**
  * Set whether the account fields should be skipped on the checkout page.
@@ -348,6 +366,11 @@ if ( $submit && $pmpro_msgt != "pmpro_error" ) {
 		// If this is false, there should have been an error message set by the filter but just in case, set a generic error message.
 		pmpro_setMessage( __( 'Checkout checks failed.', 'paid-memberships-pro' ), 'pmpro_error' );
 	}
+
+	// Standalone checkouts (level_id=0) do not support subscriptions.
+	if ( intval( $pmpro_level->id ) === 0 && ! empty( $pmpro_level->billing_amount ) && $pmpro_level->billing_amount > 0 && ! empty( $pmpro_level->cycle_number ) ) {
+		pmpro_setMessage( __( 'Subscriptions are not supported for standalone checkouts.', 'paid-memberships-pro' ), 'pmpro_error' );
+	}
 }
 
 // If there is still a valid checkout submission and we don't have an order yet, run the the code needed to get to that point in the checkout process.
@@ -367,8 +390,21 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 		}
 	}
 
-	// If we don't have a user yet, check the user fields.
-	if ( empty( $current_user->ID ) ) {
+	/**
+	 * Filter whether to skip user creation during checkout.
+	 *
+	 * When true, the checkout will proceed without creating a WordPress user
+	 * and will skip user field validation. Useful for guest checkouts.
+	 *
+	 * @since TBD
+	 *
+	 * @param bool   $skip_user_creation Whether to skip user creation. Default false.
+	 * @param object $pmpro_level        The level being purchased.
+	 */
+	$pmpro_skip_user_creation = apply_filters( 'pmpro_skip_user_creation', false, $pmpro_level );
+
+	// If we don't have a user yet and we're not skipping user creation, check the user fields.
+	if ( empty( $current_user->ID ) && ! $pmpro_skip_user_creation ) {
 		foreach ( $pmpro_required_user_fields as $key => $field ) {
 			if ( ! $field ) {
 				$pmpro_error_fields[] = $key;
@@ -451,8 +487,8 @@ if ( $submit && $pmpro_msgt != 'pmpro_error' && empty( $pmpro_review ) ) {
 		}
 	}
 
-	// If there is still a vaild checkout submission but we don't have a user yet, create one.
-	if ( $pmpro_msgt != "pmpro_error" && empty( $current_user->ID ) ) {
+	// If there is still a valid checkout submission but we don't have a user yet, create one.
+	if ( $pmpro_msgt != "pmpro_error" && empty( $current_user->ID ) && ! $pmpro_skip_user_creation ) {
 		//first name
 		if ( ! empty( $_REQUEST['first_name'] ) ) {
 			$first_name = sanitize_text_field( $_REQUEST['first_name'] );
