@@ -158,7 +158,7 @@ function pmpro_checkLevelForBraintreeCompatibility($level = NULL)
 			}
 			
 			//check for plan
-			if(pmpro_isLevelRecurring($level)) {
+			if(pmpro_isLevelRecurring($level) && class_exists('PMProGateway_braintree')) {
 				if(!PMProGateway_braintree::checkLevelForPlan($level->id))
 					return false;
 			}

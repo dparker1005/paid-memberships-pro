@@ -65,10 +65,10 @@ function pmpro_has_undeprecated_gateways() {
 }
 
 /**
- * Adds back deprecated gateways if they have ever been the selected gateway.
- * In future versions, we will remove gateway code entirely.
- * And you will have to use a stand alone add on for those gateways
- * or choose a new gateway.
+ * Track the deprecated gateways this site has used.
+ *
+ * The gateways themselves were removed in 4.0. The Legacy Gateways Add On loads
+ * the ones in this list.
  */
 function pmpro_check_for_deprecated_gateways() {
 	$undeprecated_gateways = pmpro_get_undeprecated_gateways();
@@ -77,7 +77,6 @@ function pmpro_check_for_deprecated_gateways() {
 	$deprecated_gateways = pmpro_get_deprecated_gateways();
 	foreach ( $deprecated_gateways as $deprecated_gateway ) {
 		if ( $default_gateway === $deprecated_gateway || in_array( $deprecated_gateway, $undeprecated_gateways, true ) ) {
-			require_once( PMPRO_DIR . '/classes/gateways/class.pmprogateway_' . $deprecated_gateway . '.php' );
 			if ( ! in_array( $deprecated_gateway, $undeprecated_gateways, true ) ) {
 				$undeprecated_gateways[] = $deprecated_gateway;
 				update_option( 'pmpro_undeprecated_gateways', $undeprecated_gateways );
