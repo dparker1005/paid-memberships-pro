@@ -462,8 +462,6 @@ function pmpro_after_checkout_save_fields( $user_id, $order ) {
 	}
 }
 add_action( 'pmpro_after_checkout', 'pmpro_after_checkout_save_fields', 10, 2 );
-add_action( 'pmpro_before_send_to_paypal_standard', 'pmpro_after_checkout_save_fields', 20, 2 );	//for paypal standard we need to do this just before sending the user to paypal
-add_action( 'pmpro_before_send_to_twocheckout', 'pmpro_after_checkout_save_fields', 20, 2 );	//for 2checkout we need to do this just before sending the user to 2checkout
 add_action( 'pmpro_before_send_to_gourl', 'pmpro_after_checkout_save_fields', 20, 2 );	//for the GoURL Bitcoin Gateway Add On
 add_action( 'pmpro_before_send_to_payfast', 'pmpro_after_checkout_save_fields', 20, 2 );	//for the Payfast Gateway Add On
 
@@ -538,76 +536,6 @@ function pmpro_registration_checks_for_user_fields( $okay ) {
 	return $okay;
 }
 add_filter( 'pmpro_checkout_order_creation_checks', 'pmpro_registration_checks_for_user_fields' );
-
-/**
- * Sessions vars for TwoCheckout. PayPal Express was updated to store in order meta.
- *
- * @deprecated 2.12.4 Use pmpro_after_checkout_save_fields instead to save fields immediately or pmpro_save_checkout_data_to_order for delayed checkouts.
- */
-function pmpro_paypalexpress_session_vars_for_user_fields() {
-	// phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing -- Deprecated and no longer hooked by core. It ran during PayPal Express checkout processing, after preheaders/checkout.php verified pmpro_checkout_nonce, and only copies submitted values into the visitor's own session.
-	_deprecated_function( __FUNCTION__, '2.12.4', 'pmpro_after_checkout_save_fields' );
-
-	// Loop through all the field groups.
-	$field_groups = PMPro_Field_Group::get_all();
-	foreach($field_groups as $group_name => $group) {
-		// Loop through all the fields in the group.
-		$fields = $group->get_fields();
-		foreach($fields as $field)
-		{
-			if( ! pmpro_is_field( $field ) ) {
-				continue;
-			}
-			
-			if ( ! pmpro_check_field_for_level( $field ) ) {
-				continue;
-			}
-
-			if( isset( $_REQUEST[$field->name] ) ) {
-				$_SESSION[$field->name] = pmpro_sanitize( $_REQUEST[$field->name], $field ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Sanitized by pmpro_sanitize(). Left slashed on purpose to match PMPro_Field::get_value_from_request(): the session value is later saved with update_user_meta(), which unslashes, so unslashing here would strip backslashes twice.
-			} elseif ( isset( $_FILES[$field->name] ) ) {
-				/*
-					We need to save the file somewhere and save values in $_SESSION
-				*/
-				// Make sure the file is allowed.
-				$upload_check = pmpro_check_upload( $field->name );
-				if ( is_wp_error( $upload_check ) ) {
-					continue;
-				}
-
-				// Get $file and $filetype.
-				$file = array_map( 'sanitize_text_field', $_FILES[ $field->name ] );
-				$filetype = wp_check_filetype_and_ext( $file['tmp_name'], $file['name'] );
-
-				// Make sure file was uploaded during this page load.
-				if ( ! is_uploaded_file( sanitize_text_field( $file['tmp_name'] ) ) ) {						
-					continue;
-				}
-
-				//check for a register helper directory in wp-content
-				$upload_dir = wp_upload_dir();
-				$pmprorh_dir = $upload_dir['basedir'] . "/pmpro-register-helper/tmp/";
-
-				//create the dir and subdir if needed
-				if(!is_dir($pmprorh_dir))
-				{
-					wp_mkdir_p($pmprorh_dir);
-				}
-
-				//move file
-				$new_filename = $pmprorh_dir . basename( sanitize_file_name( $file['name'] ) );
-				move_uploaded_file( sanitize_text_field( $file['tmp_name'] ), $new_filename );
-
-				//update location of file
-				$_FILES[$field->name]['tmp_name'] = $new_filename;
-
-				//save file info in session
-				$_SESSION[$field->name] = array_map( 'sanitize_text_field', $file );
-			}
-		}
-	}
-	// phpcs:enable WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing
-}
 
 /**
  * Show user fields in profile.

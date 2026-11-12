@@ -148,7 +148,7 @@
 		private $status = '';
 
 		/**
-		 * The Gateway identifier (stripe, paypalexpress etc)
+		 * The Gateway identifier (stripe, check etc)
 		 *
 		 * @since 2.9
 		 *

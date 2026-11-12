@@ -289,8 +289,8 @@ function pmpro_gateways() {
  * 
  * @since 3.6.1
  * 
- * @param string $gateway The gateway's internal slug (i.e. paypalexpress).
- * @return string The gateway's nicename (i.e. PayPal Express).
+ * @param string $gateway The gateway's internal slug (i.e. stripe).
+ * @return string The gateway's nicename (i.e. Stripe).
  */
 function pmpro_get_gateway_nicename( $gateway ) {
 	$gateways = pmpro_gateways();

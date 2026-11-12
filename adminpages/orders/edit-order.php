@@ -226,7 +226,7 @@ if ( ! empty( $order->id ) ) { ?>
 					</th>
 					<td>
 						<input id="payment_type" name="payment_type" type="text" size="50" value="<?php echo esc_attr( $order->payment_type ); ?>"/>
-						<p class="description"><?php esc_html_e( 'e.g. PayPal Express, PayPal Standard, Credit Card.', 'paid-memberships-pro' ); ?></p>
+						<p class="description"><?php esc_html_e( 'e.g. PayPal, Credit Card.', 'paid-memberships-pro' ); ?></p>
 					</td>
 				</tr>
 				<tr>

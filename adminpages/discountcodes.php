@@ -12,7 +12,7 @@
 	}
 
 	//vars
-	global $wpdb, $pmpro_currency_symbol, $pmpro_stripe_error, $pmpro_braintree_error, $pmpro_pages, $gateway;
+	global $wpdb, $pmpro_currency_symbol, $pmpro_stripe_error, $pmpro_pages, $gateway;
 
 	$now = current_time( 'timestamp' );
 
@@ -851,9 +851,7 @@
 										?>
 										</select>
 										<p class="description"><?php esc_html_e('The amount to be billed one cycle after the initial payment.', 'paid-memberships-pro' );?></p>
-										<?php if($gateway == "braintree") { ?>
-											<strong <?php if(!empty($pmpro_braintree_error)) { ?>class="pmpro_red"<?php } ?>><?php esc_html_e('Braintree integration currently only supports billing periods of "Month" or "Year".', 'paid-memberships-pro' );?></strong>
-										<?php } elseif($gateway == "stripe") { ?>
+										<?php if($gateway == "stripe") { ?>
 											<p class="description"><strong <?php if(!empty($pmpro_stripe_error)) { ?>class="pmpro_red"<?php } ?>><?php esc_html_e('Stripe integration does not allow billing periods longer than 1 year.', 'paid-memberships-pro' );?></strong></p>
 										<?php }?>
 									</td>

@@ -75,22 +75,6 @@ function pmpro_handle_subscription_cancellation_at_gateway( $subscription_transa
 		return 'The user no longer has the membership level associated with this subscription. No membership cancellation is needed. ( Subscription Transaction ID #' . $subscription_transaction_id . ')';
 	}
 
-	// Legacy Braintree code to add action on subscription cancellation.
-	if ( 'braintree' === $gateway ) {
-		$newest_order = $subscription->get_orders( array( 'limit' => 1 ) );
-		if ( ! empty( $newest_order ) ) {
-			/**
-			 * Action for when a subscription is cancelled at a payment gateway.
-			 * Legacy filter brought over from Braintree.
-			 *
-			 * @deprecated 3.0
-			 *
-			 * @param MemberOrder $newest_order The most recent order associated with the subscription.
-			 */
-			do_action_deprecated( 'pmpro_subscription_cancelled', array( current( $newest_order ) ), '3.0' );
-		}
-	}
-
 	// Check if we want to try to extend the user's membership to the next payment date.
 	if ( apply_filters( 'pmpro_cancel_on_next_payment_date', true, $subscription->get_membership_level_id(), $user->ID ) ) {
 		// Check if $old_next_payment_date is in the future and that we don't have pending payments.
@@ -174,7 +158,7 @@ function pmpro_handle_recurring_payment_succeeded_at_gateway( $order_data ) {
 		}
 	} else {
 		// Also check for any pending orders that don't have a payment_transaction_id.
-		// This could happen for PayPal Express payment failures, for example.
+		// This could happen for offsite gateway payment failures, for example.
 		$existing_orders = $subscription->get_orders(
 			array(
 				'status' => 'pending',

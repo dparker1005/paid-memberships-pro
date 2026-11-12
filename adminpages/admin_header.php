@@ -56,77 +56,6 @@
 			$msgt .= " <a href=\"" . admin_url('admin.php?page=pmpro-membershiplevels') . "\">" . __("Please edit your levels", 'paid-memberships-pro' ) . "</a>.";
 	}
 
-	if(!pmpro_checkLevelForPayflowCompatibility())
-	{
-		$msg = -1;
-		$msgt = __("The billing details for some of your membership levels is not supported by Payflow.", 'paid-memberships-pro' );
-		if($view == "pmpro-membershiplevels" && !empty($edit_level) && $edit_level > 0)
-		{
-			if(!pmpro_checkLevelForPayflowCompatibility($edit_level))
-			{
-				global $pmpro_payflow_error;
-				$pmpro_payflow_error = true;
-				$msg = -1;
-				$msgt = __("The billing details for this level are not supported by Payflow. Please review the notes in the Billing Details section below.", 'paid-memberships-pro' );
-			}
-		}
-		elseif($view == "pmpro-membershiplevels")
-			$msgt .= " " . __("The levels with issues are highlighted below.", 'paid-memberships-pro' );
-		else
-			$msgt .= " <a href=\"" . admin_url('admin.php?page=pmpro-membershiplevels') . "\">" . __("Please edit your levels", 'paid-memberships-pro' ) . "</a>.";
-	}
-
-	if(!pmpro_checkLevelForBraintreeCompatibility())
-	{
-		global $pmpro_braintree_error;
-
-		if ( false == $pmpro_braintree_error ) {
-			$msg  = - 1;
-			$msgt = __( "The billing details for some of your membership levels is not supported by Braintree.", 'paid-memberships-pro' );
-		}
-		if($view == "pmpro-membershiplevels" && !empty($edit_level) && $edit_level > 0)
-		{
-			if(!pmpro_checkLevelForBraintreeCompatibility($edit_level))
-			{
-
-				// Don't overwrite existing messages
-				if ( false == $pmpro_braintree_error  ) {
-					$pmpro_braintree_error = true;
-					$msg                   = - 1;
-					$msgt                  = __( "The billing details for this level are not supported by Braintree. Please review the notes in the Billing Details section below.", 'paid-memberships-pro' );
-				}
-			}
-		}
-		elseif($view == "pmpro-membershiplevels")
-			$msgt .= " " . __("The levels with issues are highlighted below.", 'paid-memberships-pro' );
-		else {
-			if ( false === $pmpro_braintree_error  ) {
-				$msgt .= " <a href=\"" . admin_url( 'admin.php?page=pmpro-membershiplevels' ) . "\">" . __( "Please edit your levels", 'paid-memberships-pro' ) . "</a>.";
-			}
-		}
-	}
-
-	if(!pmpro_checkLevelForTwoCheckoutCompatibility())
-	{
-		$msg = -1;
-		$msgt = __("The billing details for some of your membership levels is not supported by TwoCheckout.", 'paid-memberships-pro' );
-		if($view == "pmpro-membershiplevels" && !empty($edit_level) && $edit_level > 0)
-		{
-			if(!pmpro_checkLevelForTwoCheckoutCompatibility($edit_level))
-			{
-				global $pmpro_twocheckout_error;
-				$pmpro_twocheckout_error = true;
-
-				$msg = -1;
-				$msgt = __("The billing details for this level are not supported by 2Checkout. Please review the notes in the Billing Details section below.", 'paid-memberships-pro' );
-			}
-		}
-		elseif($view == "pmpro-membershiplevels")
-			$msgt .= " " . __("The levels with issues are highlighted below.", 'paid-memberships-pro' );
-		else
-			$msgt .= " <a href=\"" . admin_url('admin.php?page=pmpro-membershiplevels') . "\">" . __("Please edit your levels", 'paid-memberships-pro' ) . "</a>.";
-	}
-
 	if ( ! pmpro_check_discount_code_for_gateway_compatibility() ) {
 		$msg = -1;
 		$msgt = __( 'The billing details for some of your discount codes are not supported by your gateway.', 'paid-memberships-pro' );
@@ -147,16 +76,9 @@
 	$gateway = get_option( 'pmpro_gateway' );
 	if($gateway == "stripe" && version_compare( PHP_VERSION, '5.3.29', '>=' ) ) {
 		PMProGateway_stripe::dependencies();
-	} elseif($gateway == "braintree" && version_compare( PHP_VERSION, '5.4.45', '>=' ) ) {
-		if ( class_exists( 'PMProGateway_braintree' ) ) {
-			PMProGateway_braintree::dependencies();
-		}
 	} elseif($gateway == "stripe" && version_compare( PHP_VERSION, '5.3.29', '<' ) ) {
         $msg = -1;
         $msgt = sprintf(__("The Stripe Gateway requires PHP 5.3.29 or greater. We recommend upgrading to PHP %s or greater. Ask your host to upgrade.", "paid-memberships-pro" ), PMPRO_MIN_PHP_VERSION );
-    } elseif($gateway == "braintree" && version_compare( PHP_VERSION, '5.4.45', '<' ) ) {
-        $msg = -1;
-        $msgt = sprintf(__("The Braintree Gateway requires PHP 5.4.45 or greater. We recommend upgrading to PHP %s or greater. Ask your host to upgrade.", "paid-memberships-pro" ), PMPRO_MIN_PHP_VERSION );
     }
 
 	//if no errors yet, let's check and bug them if < our PMPRO_MIN_PHP_VERSION

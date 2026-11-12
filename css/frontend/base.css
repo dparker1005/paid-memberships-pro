@@ -234,10 +234,6 @@ button[type="button"]#other_discount_code_toggle:focus {
 }
 
 /* PayPal gateway Membership Checkout specific styles. */
-#pmpro_payment_method span.gateway_paypalexpress {
-	margin-left: var(--pmpro--base--spacing--large);
-}
-
 [id^="pmpro_paypal"] .pmpro_btn-submit-checkout-paypal-image {
 	background-image: url(../../images/paypal-color.svg);
 	background-repeat: no-repeat;

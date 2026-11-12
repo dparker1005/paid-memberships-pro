@@ -426,16 +426,8 @@ class PMPro_Wisdom_Integration {
 
 		// Detect any gateway settings.
 		$gateway_settings_detected = [
-			'authorizenet'   => get_option( 'pmpro_loginname' ),
-			'braintree'      => get_option( 'pmpro_braintree_merchantid' ),
-			'cybersource'    => get_option( 'pmpro_cybersource_merchantid' ),
-			'payflowpro'     => get_option( 'pmpro_payflow_user' ),
-			'paypalwpp'      => get_option( 'pmpro_apiusername' ),
-			'paypalexpress'  => get_option( 'paypalexpress_skip_confirmation' ),
-			'paypalstandard' => get_option( 'gateway_email' ),
 			'stripe'         => $stripe_using_legacy_keys || $stripe_using_api_keys || $stripe_has_connect_credentials,
 			'stripe_sandbox' => get_option( 'sandbox_stripe_connect_user_id' ),
-			'twocheckout'    => get_option( 'twocheckout_accountnumber' ),
 		];
 
 		// Remove any gateway settings that are not set or are empty.

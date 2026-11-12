@@ -228,7 +228,6 @@
 
 											// Special Cases for Add Ons that add secondary gateways. These will be removed when core natively supports multiple gateways.
 											if (
-												( function_exists( 'pmproappe_pmpro_valid_gateways' ) && $gateway_slug === 'paypalexpress' ) || // Add PayPal Express Add On.
 												( defined( 'PMPROPBC_VER' ) && $gateway_slug === 'check' ) || // Pay by Check Add On.
 												( $gateway_slug === 'paypal' && function_exists( 'pmpro_paypal_is_secondary' ) && pmpro_paypal_is_secondary() ) // PayPal Gateway Add On (only when configured to act as a secondary).
 											) {
@@ -247,7 +246,7 @@
 												if ( pmpro_getOption( 'gateway' ) === $gateway_slug ) {
 													$gateway_status_html = '<span class="pmpro_tag pmpro_tag-has_icon pmpro_tag-error">' . esc_html__( 'Enabled (Not Supported)', 'paid-memberships-pro' ) . '</span>';
 												} elseif ( $gateway_status_html !== esc_html__( '&#8212;', 'paid-memberships-pro' ) ) {
-													// Gateway is enabled (e.g. via Add PayPal Express Add On) but deprecated.
+													// Gateway is enabled (e.g. via an Add On) but deprecated.
 													$gateway_status_html .= ' <span class="pmpro_tag pmpro_tag-has_icon pmpro_tag-error">' . esc_html__( 'Not Supported', 'paid-memberships-pro' ) . '</span>';
 												}
 											}

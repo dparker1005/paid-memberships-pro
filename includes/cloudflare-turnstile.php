@@ -74,7 +74,7 @@ function pmpro_cloudflare_turnstile_validation( $okay ) {
 		return $okay;
 	}
 
-	// Don't show it more than once on a screen. This is for "PayPal Express".
+	// Don't show it more than once on a screen, such as a review page after an offsite gateway.
 	if ( pmpro_get_session_var( 'pmpro_cloudflare_turnstile_validated' ) ) {
 		return $okay;
 	}

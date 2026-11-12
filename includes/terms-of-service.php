@@ -199,7 +199,7 @@ function pmpro_after_checkout_update_consent( $user_id, $order ) {
 		$tospage_id = get_option( 'pmpro_tospage' );
 		pmpro_save_consent( $user_id, $tospage_id, NULL, $order->id );
 	} elseif ( !empty( $_SESSION['tos'] ) ) {
-		// PayPal Express and others might save tos info into a session variable
+		// Offsite gateways might save tos info into a session variable
 		$tospage_id = isset( $_SESSION['tos']['post_id'] ) ? $_SESSION['tos']['post_id'] : NULL; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Server-side session value set by gateway code, not request input; pmpro_save_consent() falls back to the TOS page option when empty.
 		$tospage_modified = isset( $_SESSION['tos']['post_modified'] ) ? $_SESSION['tos']['post_modified'] : NULL; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Server-side session value set by gateway code, not request input; pmpro_save_consent() falls back to the TOS post's post_modified when empty.
 		pmpro_save_consent( $user_id, $tospage_id, $tospage_modified, $order->id );
@@ -207,8 +207,6 @@ function pmpro_after_checkout_update_consent( $user_id, $order ) {
 	}
 }
 add_action( 'pmpro_after_checkout', 'pmpro_after_checkout_update_consent', 10, 2 );
-add_action( 'pmpro_before_send_to_paypal_standard', 'pmpro_after_checkout_update_consent', 10, 2);
-add_action( 'pmpro_before_send_to_twocheckout', 'pmpro_after_checkout_update_consent', 10, 2);
 add_action( 'pmpro_before_send_to_payfast', 'pmpro_after_checkout_update_consent', 10, 2 );
 
 /**

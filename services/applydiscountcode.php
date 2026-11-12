@@ -186,7 +186,7 @@
 			}
 
 			//hide/show billing
-			if(pmpro_areLevelsFree($code_levels) || pmpro_getGateway() == "paypalexpress" || pmpro_getGateway() == "paypalstandard" || pmpro_getGateway() == 'check')
+			if(pmpro_areLevelsFree($code_levels) || pmpro_getGateway() == 'check')
 			{
 				?>
 				jQuery('#pmpro_billing_address_fields').hide();
@@ -199,25 +199,6 @@
 				jQuery('#pmpro_billing_address_fields').show();
 				jQuery('#pmpro_payment_information_fields').show();
 				<?php
-			}
-
-			//hide/show paypal button
-			if(pmpro_getGateway() == "paypalexpress" || pmpro_getGateway() == "paypalstandard")
-			{
-				if(pmpro_areLevelsFree($code_levels))
-				{
-					?>
-					jQuery('#pmpro_paypalexpress_checkout').hide();
-					jQuery('#pmpro_submit_span').show();
-					<?php
-				}
-				else
-				{
-					?>
-					jQuery('#pmpro_submit_span').hide();
-					jQuery('#pmpro_paypalexpress_checkout').show();
-					<?php
-				}
 			}
 
 			//filter to insert your own code. Not MMPU compatible.

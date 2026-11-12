@@ -89,53 +89,6 @@ add_filter( 'pmpro_checkout_level', 'pmpro_checkout_level_set_expiration_date' )
 add_filter( 'pmpro_paystack_webhook_level', 'pmpro_checkout_level_set_expiration_date' );
 add_filter( 'pmpro_payfast_itnhandler_level', 'pmpro_checkout_level_set_expiration_date' );
 /*
-	Same thing as above but when processed by the ipnhandler for PayPal standard.
-*/
-function pmpro_ipnhandler_level_extend_memberships( $level, $user_id ) {
-	global $pmpro_msg, $pmpro_msgt;
-
-	// does this level expire? are they an existing user of this level?
-	if ( ! empty( $level ) && ! empty( $level->expiration_number ) && pmpro_hasMembershipLevel( $level->id, $user_id ) ) {
-		// get the current enddate of their membership
-		$user_level = pmpro_getSpecificMembershipLevelForUser( $user_id, $level->id );
-
-		// bail if their existing level doesn't have an end date
-		if ( empty( $user_level ) || empty( $user_level->enddate ) ) {
-			return $level;
-		}
-
-		// calculate days left
-		$todays_date = current_time( 'timestamp' );
-		$expiration_date = $user_level->enddate;
-		$time_left = $expiration_date - $todays_date;
-
-		// time left?
-		if ( $time_left > 0 ) {
-			// convert to days and add to the expiration date (assumes expiration was 1 year)
-			$days_left = floor( $time_left / ( 60 * 60 * 24 ) );
-
-			// figure out days based on period
-			if ( $level->expiration_period == 'Day' ) {
-				$total_days = $days_left + $level->expiration_number;
-			} elseif ( $level->expiration_period == 'Week' ) {
-				$total_days = $days_left + $level->expiration_number * 7;
-			} elseif ( $level->expiration_period == 'Month' ) {
-				$total_days = $days_left + $level->expiration_number * 30;
-			} elseif ( $level->expiration_period == 'Year' ) {
-				$total_days = $days_left + $level->expiration_number * 365;
-			}
-
-			// update number and period
-			$level->expiration_number = $total_days;
-			$level->expiration_period = 'Day';
-		}
-	}
-
-	return $level;
-}
-add_filter( 'pmpro_ipnhandler_level', 'pmpro_ipnhandler_level_extend_memberships', 10, 2 );
-
-/*
 	If checking out for the same level, keep your old startdate.
 	Added with 1.5.5
 */
@@ -217,26 +170,6 @@ function pmpro_pmpro_level_description( $description ) {
 	return wpautop( $description );
 }
 add_filter( 'pmpro_level_description', 'pmpro_pmpro_level_description' );
-
-/*
-	PayPal doesn't allow start dates > 1 year out.
-	So if we detect that, let's try to squeeze some of
-	that time into a trial.
-
-	Otherwise, let's cap at 1 year out.
-
-	Note that this affects PayPal Standard as well, but the fix
-	for that flavor of PayPal is different and may be included in future
-	updates.
-
-	This function is being deprecated as ProfileStartDate is no longer stored as an order property.
-	This is now coded directly into the PayPal Express subscribe() function.
-	@deprecated 3.2
-*/
-function pmpro_pmpro_subscribe_order_startdate_limit( $order, $gateway ) {
-	_deprecated_function( __FUNCTION__, '3.2' );
-	return $order;
-}
 
 /**
  * Before changing membership at checkout,

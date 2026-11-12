@@ -3402,54 +3402,12 @@ function pmpro_is_ready() {
 	} else {
 		$gateway             = get_option( 'pmpro_gateway' );
 		$gateway_environment = get_option( 'pmpro_gateway_environment' );
-		if ( $gateway == 'authorizenet' ) {
-			if ( $gateway_environment && get_option( 'pmpro_loginname' ) && get_option( 'pmpro_transactionkey' ) ) {
-				$pmpro_gateway_ready = true;
-			} else {
-				$pmpro_gateway_ready = false;
-			}
-		} elseif ( $gateway == 'paypalwpp' || $gateway == 'paypalexpress' ) {
-			if ( $gateway_environment && get_option( 'pmpro_gateway_email' ) && get_option( 'pmpro_apiusername' ) && get_option( 'pmpro_apipassword' ) && get_option( 'pmpro_apisignature' ) ) {
-				$pmpro_gateway_ready = true;
-			} else {
-				$pmpro_gateway_ready = false;
-			}
-		} elseif ( $gateway == 'paypalstandard' ) {
-			if ( $gateway_environment && get_option( 'pmpro_gateway_email' ) ) {
-				$pmpro_gateway_ready = true;
-			} else {
-				$pmpro_gateway_ready = false;
-			}
-		} elseif ( $gateway == 'payflowpro' ) {
-			if ( get_option( 'pmpro_payflow_partner' ) && get_option( 'pmpro_payflow_vendor' ) && get_option( 'pmpro_payflow_user' ) && get_option( 'pmpro_payflow_pwd' ) ) {
-				$pmpro_gateway_ready = true;
-			} else {
-				$pmpro_gateway_ready = false;
-			}
-		} elseif ( $gateway == 'stripe' ) {
+		if ( $gateway == 'stripe' ) {
 			if ( $gateway_environment && get_option( 'pmpro_stripe_secretkey' ) && get_option( 'pmpro_stripe_publishablekey' ) ) {
 				// Using legacy keys.
 				$pmpro_gateway_ready = true;
 			} elseif ( $gateway_environment && get_option( 'pmpro_' . $gateway_environment . '_stripe_connect_secretkey' ) && get_option( 'pmpro_' . $gateway_environment . '_stripe_connect_publishablekey' ) ) {
 				// Using connect.
-				$pmpro_gateway_ready = true;
-			} else {
-				$pmpro_gateway_ready = false;
-			}
-		} elseif ( $gateway == 'braintree' ) {
-			if ( $gateway_environment && get_option( 'pmpro_braintree_merchantid' ) && get_option( 'pmpro_braintree_publickey' ) && get_option( 'pmpro_braintree_privatekey' ) ) {
-				$pmpro_gateway_ready = true;
-			} else {
-				$pmpro_gateway_ready = false;
-			}
-		} elseif ( $gateway == 'twocheckout' ) {
-			if ( $gateway_environment && get_option( 'pmpro_twocheckout_apiusername' ) && get_option( 'pmpro_twocheckout_apipassword' ) ) {
-				$pmpro_gateway_ready = true;
-			} else {
-				$pmpro_gateway_ready = false;
-			}
-		} elseif ( $gateway == 'cybersource' ) {
-			if ( $gateway_environment && get_option( 'pmpro_cybersource_merchantid' ) && get_option( 'pmpro_cybersource_securitykey' ) ) {
 				$pmpro_gateway_ready = true;
 			} else {
 				$pmpro_gateway_ready = false;
@@ -5051,7 +5009,7 @@ function pmpro_allowed_refunds( $order ) {
 	 *
 	 * @param array $allowed_gateways A list of allowed gateways to work with refunds
 	 */
-	$allowed_gateways = apply_filters( 'pmpro_allowed_refunds_gateways', array( 'stripe', 'paypalexpress' ) );
+	$allowed_gateways = apply_filters( 'pmpro_allowed_refunds_gateways', array( 'stripe' ) );
 
 	//Only apply to these gateways
 	if( in_array( $order->gateway, $allowed_gateways, true ) ) {
